@@ -3,7 +3,7 @@ import numpy as np
 import tensorflow as tf
 from ROOT import TFile, RDataFrame
 
-kalman_file = TFile("/data/bfys/raaij/NTuples/PrCheckerPlots.root")
+kalman_file = TFile("../data/PrCheckerPlots.root")
 columns = ["x", "y", "tx", "ty", "best_qop", "best_pt", "kalman_ip_chi2",
            "kalman_docaz", "chi2", "chi2V", "chi2UT", "chi2T",
            "ndof", "ndofV", "ndofT", "nUT", "ghost"]

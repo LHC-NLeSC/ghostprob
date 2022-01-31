@@ -45,9 +45,10 @@ def __main__():
     np_df = df.AsNumpy()
     print(f"Columns in the table: {len(np_df)}")
     print(f"Columns for training: {len(columns)}")
-    print(f"Entries in the table: {len(np_df['ghost'])}")
+    print(f"Entries in the table: {len(np_df['p'])}")
     labels = np_df["ghost"].astype(int)
     data = [np_df[column] for column in columns]
+    data = np.hstack([data[i].reshape(len(np_df["p"], 1) for i in range(len(data)])
 
 
 if __name__ == "__main__":

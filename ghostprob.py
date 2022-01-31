@@ -53,6 +53,14 @@ def __main__():
     # Split into real tracks and ghosts
     data_tracks = data[labels == 0]
     data_ghosts = data[labels == 1]
+    
+    # Shuffle tracks and select the same number of real tracks and ghosts
+    rng = np.random.default_rng()
+    data_tracks = rng.shuffle(data_tracks)[:len(data_ghosts)]
+    print(f"Number of real tracks ({len(data_tracks}) and ghost tracks ({len(data_ghosts})")
+
+    # Training data
+    data = np.vstack((data_tracks, data_ghosts))
 
 
 if __name__ == "__main__":

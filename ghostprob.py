@@ -28,6 +28,12 @@ def command_line():
     return parser.parse_args()
 
 
+def shuffle_data(rng, data, labels):
+    assert(len(data) == len(labels))
+    permutation = rng.permutation(len(data))
+    return data[permutation], labels[permutation]
+
+
 def __main__():
     arguments = command_line()
 
@@ -60,8 +66,12 @@ def __main__():
     data_tracks = data_tracks[:len(data_ghosts)]
     print(f"Number of real tracks ({len(data_tracks)}) and ghost tracks ({len(data_ghosts)})")
 
-    # Training data
+    # Assemble training data set and labels
     data = np.vstack((data_tracks, data_ghosts))
+    labels_tracks = np.zeros((len(data_ghosts), 1), dtype=int)
+    labels_ghosts = np.ones((len(data_ghosts), 1), dtype=int)
+    labels = np.vstack((labels_tracks, labels_ghosts))
+    data, labels = shuffle_data(rng, data, labels)
 
 
 if __name__ == "__main__":

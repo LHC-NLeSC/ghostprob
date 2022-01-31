@@ -48,7 +48,7 @@ def __main__():
     print(f"Entries in the table: {len(np_df['p'])}")
     labels = np_df["ghost"].astype(int)
     data = [np_df[column] for column in columns]
-    data = np.hstack([data[i].reshape(len(np_df["p"], 1) for i in range(len(data)])
+    data = np.hstack([data[i].reshape(len(np_df["p"]), 1) for i in range(len(data))])
 
 
 if __name__ == "__main__":

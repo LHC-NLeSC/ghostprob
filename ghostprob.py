@@ -56,7 +56,8 @@ def __main__():
     
     # Shuffle tracks and select the same number of real tracks and ghosts
     rng = np.random.default_rng()
-    data_tracks = rng.shuffle(data_tracks)[:len(data_ghosts)]
+    data_tracks = rng.shuffle(data_tracks)
+    data_tracks = data_tracks[:len(data_ghosts)]
     print(f"Number of real tracks ({len(data_tracks)}) and ghost tracks ({len(data_ghosts)})")
 
     # Training data

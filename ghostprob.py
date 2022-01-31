@@ -50,6 +50,10 @@ def __main__():
     data = [np_df[column] for column in columns]
     data = np.hstack([data[i].reshape(len(np_df["p"]), 1) for i in range(len(data))])
 
+    # Split into real tracks and ghosts
+    data_tracks = data[labels == 0]
+    data_ghost = data[labels == 1]
+
 
 if __name__ == "__main__":
     __main__()

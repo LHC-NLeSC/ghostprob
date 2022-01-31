@@ -52,7 +52,7 @@ def __main__():
 
     # Split into real tracks and ghosts
     data_tracks = data[labels == 0]
-    data_ghost = data[labels == 1]
+    data_ghosts = data[labels == 1]
 
 
 if __name__ == "__main__":

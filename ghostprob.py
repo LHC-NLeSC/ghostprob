@@ -45,3 +45,6 @@ def __main__():
     np_df = df.AsNumpy()
     print(f"Entries in the table: {len(np_df)}")
 
+
+if __name__ == "__main__":
+    __main__()

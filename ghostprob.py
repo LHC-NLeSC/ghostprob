@@ -4,10 +4,10 @@ import tensorflow as tf
 from ROOT import TFile, RDataFrame
 
 
-# File description
-columns = ["x", "y", "tx", "ty", "best_qop", "best_pt", "kalman_ip_chi2",
-           "kalman_docaz", "chi2", "chi2V", "chi2UT", "chi2T",
-           "ndof", "ndofV", "ndofT", "nUT", "ghost"]
+# Columns to use for training
+columns = ["p", "z", "x", "y", "tx", "ty", "qop", "first_qop", "best_qop", "best_pt", "kalman_ip", "kalman_ipx",
+        "kalman_ipy", "kalman_ip_chi2", "kalman_docaz", "velo_ip", "velo_ipx", "velo_ipy", "velo_ip_chi2", 
+        "velo_docaz", "chi2", "chi2V", "chi2UT", "chi2T", "ndof", "ndofV", "ndofT", "nUT", "mcp_p"]
 
 # Bounds for the values
 bounds = {"x": (-10., 10.),
@@ -43,7 +43,11 @@ def __main__():
 
     # Convert table to numpy
     np_df = df.AsNumpy()
-    print(f"Entries in the table: {len(np_df)}")
+    print(f"Columns in the table: {len(np_df)}")
+    print(f"Columns for training: {len(columns)}")
+    print(f"Entries in the table: {len(np_df['ghost'])}")
+    labels = np_df["ghost"].astype(int)
+    data = [np_df[column] for column in columns]
 
 
 if __name__ == "__main__":

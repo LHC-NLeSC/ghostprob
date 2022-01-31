@@ -3,11 +3,28 @@ import numpy as np
 import tensorflow as tf
 from ROOT import TFile, RDataFrame
 
-kalman_file = TFile("../build-cpu/output/KalmanIPCheckerOutput.root")
+kalman_file = TFile("/data/bfys/raaij/NTuples/PrCheckerPlots.root")
 columns = ["x", "y", "tx", "ty", "best_qop", "best_pt", "kalman_ip_chi2",
            "kalman_docaz", "chi2", "chi2V", "chi2UT", "chi2T",
            "ndof", "ndofV", "ndofT", "nUT", "ghost"]
-df = RDataFrame("kalman_ip_tree", kalman_file, columns).Define("p", "abs(1.f/best_qop)")
+df = RDataFrame("kalman_validator/kalman_ip_tree", kalman_file, columns).Define("p", "abs(1.f/best_qop)")
+
+bounds = {"x": (-10., 10.),
+          "y": (-10., 10.),
+          "tx": (-0.3, 0.3),
+          "ty": (-0.3, 0.3),
+          "best_pt": (0, 15000),
+          "kalman_ip_chi2": (-0.5, 10000.5),
+          "kalman_docaz": (-0.5, 25.5),
+          "chi2dof": (0, 400),
+          "chi2Vdof": (0, 150),
+          "chi2Tdof": (0, 150)}
+
+for column in columns:
+    if column in bounds:
+        lower, upper = bounds[column]
+        df = df.Filter("{0} > {1} && {0} < {2}".format(column, lower, upper))
+
 np_df = df.AsNumpy()
 
 labels_all = np_df['ghost'].astype(int)

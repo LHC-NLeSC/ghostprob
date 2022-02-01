@@ -104,7 +104,7 @@ def __main__():
             )
 
     # Evaluation
-    loss, accuracy = model.evaluate(data[test_point:], verbose=0)
+    loss, accuracy = model.evaluate(data[test_point:], labels[test_point:], verbose=0)
     print(f"Loss: {loss}, Accuracy: {accuracy}")
 
 if __name__ == "__main__":

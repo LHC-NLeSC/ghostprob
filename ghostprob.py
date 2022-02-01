@@ -73,10 +73,10 @@ def __main__():
     labels = np.vstack((labels_tracks, labels_ghosts))
     data, labels = shuffle_data(rng, data, labels)
 
-    # Keep 20% of data for validation
-    validation_point = int(len(data_ghosts) * 0.8)
-    print(f"Training set size: {validation_point}")
-    print(f"Validation set size: {len(data_ghosts) - validation_point}")
+    # Keep 20% of data for testing
+    test_point = int(len(data_ghosts) * 0.8)
+    print(f"Training set size: {test_point}")
+    print(f"Test set size: {len(data_ghosts) - test_point}")
 
     # Model
     features = len(columns)

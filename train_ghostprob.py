@@ -99,14 +99,16 @@ model = tf.keras.models.Sequential([
   tf.keras.layers.Dropout(0.1),
   tf.keras.layers.Dense(n_output, activation='sigmoid')
 ])
+model.summary()
 
 loss_fn = tf.keras.losses.BinaryCrossentropy()
 
-opt = tf.keras.optimizers.SGD(lr=0.01, momentum=0.9)
+opt = tf.keras.optimizers.SGD(learning_rate=0.01, momentum=0.9)
 model.compile(optimizer='adam',
               loss=loss_fn,
               metrics=['accuracy'])
 
-model.fit(data_train, labels_train, batch_size=1000, epochs=1000)
+model.fit(data_train, labels_train, batch_size=1000, epochs=1000, verbose=0)
 
-model.evaluate(data_test, labels_test, verbose=2)
+loss, accuracy = model.evaluate(data_test, labels_test, verbose=0)
+print(f"Loss: {loss}, Accuracy: {accuracy}")

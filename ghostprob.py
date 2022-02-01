@@ -87,7 +87,7 @@ def __main__():
     model.summary()
     model.compile(
             optimizer="adam",
-            loss=tf.keras.losses.BinaryCrossEntropy(from_logits=True),
+            loss=tf.keras.losses.BinaryCrossentropy(from_logits=True),
             metrics=["accuracy"]
             )
 

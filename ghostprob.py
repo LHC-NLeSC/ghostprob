@@ -76,7 +76,7 @@ def __main__():
     # Keep 20% of data for testing
     test_point = int(len(data_ghosts) * 0.8)
     print(f"Training set size: {test_point}")
-    print(f"Test set size: {len(data_ghosts) - test_point}")
+    print(f"Test set size: {len(data) - test_point}")
 
     # Model
     features = len(columns)
@@ -90,6 +90,21 @@ def __main__():
             loss=tf.keras.losses.BinaryCrossentropy(from_logits=True),
             metrics=["accuracy"]
             )
+
+    # Training
+    num_epochs = 100
+    batch_size = 256
+    training_history = model.fit(
+            data[:test_point],
+            labels[:test_point],
+            validation_split=0.2,
+            epochs=num_epochs,
+            batch_size=batch_size
+            )
+
+    # Evaluation
+    loss, accuracy = model.evaluate(data[test_point:])
+    print(f"Loss: {loss}, Accuracy: {accuracy}")
 
 if __name__ == "__main__":
     __main__()

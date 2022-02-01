@@ -74,8 +74,8 @@ def __main__():
     data, labels = shuffle_data(rng, data, labels)
 
     # Keep 20% of data for validation
-    validation_point = len(data_ghosts) * 0.8
-    print(f"Training set size: {len(data_ghosts)}")
+    validation_point = int(len(data_ghosts) * 0.8)
+    print(f"Training set size: {len(validation_point)}")
     print(f"Validation set size: {len(data_ghosts) - validation_point}")
 
     # Model

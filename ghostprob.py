@@ -99,11 +99,12 @@ def __main__():
             labels[:test_point],
             validation_split=0.2,
             epochs=num_epochs,
-            batch_size=batch_size
+            batch_size=batch_size,
+            verbose=0
             )
 
     # Evaluation
-    loss, accuracy = model.evaluate(data[test_point:])
+    loss, accuracy = model.evaluate(data[test_point:], verbose=0)
     print(f"Loss: {loss}, Accuracy: {accuracy}")
 
 if __name__ == "__main__":

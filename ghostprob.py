@@ -74,7 +74,7 @@ def __main__():
     data, labels = shuffle_data(rng, data, labels)
 
     # Keep 20% of data for testing
-    test_point = int(len(data_ghosts) * 0.8)
+    test_point = int(len(data) * 0.8)
     print(f"Training set size: {test_point}")
     print(f"Test set size: {len(data) - test_point}")
 

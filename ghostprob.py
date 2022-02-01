@@ -73,6 +73,23 @@ def __main__():
     labels = np.vstack((labels_tracks, labels_ghosts))
     data, labels = shuffle_data(rng, data, labels)
 
+    # Keep 20% of data for validation
+    validation_point = len(data_ghosts) * 0.8
+    print(f"Training set size: {len(data_ghosts)}")
+    print(f"Validation set size: {len(data_ghosts) - validation_point}")
+
+    # Model
+    features = len(columns)
+    model = tf.keras.models.Sequential([
+        tf.keras.layers.Dense(units=32, activation="relu"),
+        tf.keras.layers.Dense(units=1)
+        ])
+    model.summary()
+    model.compile(
+            optimizer="adam",
+            loss=tf.keras.losses.BinaryCrossEntropy(from_logits=True),
+            metrics=["accuracy"]
+            )
 
 if __name__ == "__main__":
     __main__()

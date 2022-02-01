@@ -81,7 +81,7 @@ def __main__():
     # Model
     features = len(columns)
     model = tf.keras.Sequential([
-        tf.keras.layers.Dense(units=32, activation="relu"),
+        tf.keras.layers.Dense(units=32, input_dim=features, activation="relu"),
         tf.keras.layers.Dense(units=1)
         ])
     model.summary()

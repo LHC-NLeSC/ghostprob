@@ -25,6 +25,7 @@ bounds = {"x": (-10., 10.),
 def command_line():
     parser = argparse.ArgumentParser()
     parser.add_argument("-f", "--filename", help="File with validator data", type=str, required=True)
+    parser.add_argument("--bound", help="Filter entries outside the boundaries", action="store_true")
     return parser.parse_args()
 
 
@@ -42,10 +43,11 @@ def __main__():
     df = RDataFrame("kalman_validator/kalman_ip_tree", kalman_file, columns).Define("p", "abs(1.f/best_qop)")
 
     # Filter out of bounds data
-    for column in columns:
-        if column in bounds:
-            lower, upper = bounds[column]
-            df = df.Filter(f"{column} > {lower} && {column} < {upper}")
+    if arguments.bound:
+        for column in columns:
+            if column in bounds:
+                lower, upper = bounds[column]
+                df = df.Filter(f"{column} > {lower} && {column} < {upper}")
 
     # Convert table to numpy
     np_df = df.AsNumpy()

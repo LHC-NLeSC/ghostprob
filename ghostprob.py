@@ -44,6 +44,7 @@ def __main__():
 
     # Filter out of bounds data
     if arguments.bound:
+        print("Filtering out of bounds entries.")
         for column in columns:
             if column in bounds:
                 lower, upper = bounds[column]

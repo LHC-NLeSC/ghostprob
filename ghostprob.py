@@ -26,6 +26,9 @@ bounds = {"x": (-10., 10.),
 def command_line():
     parser = argparse.ArgumentParser()
     parser.add_argument("-f", "--filename", help="File with validator data", type=str, required=True)
+    # Parameters
+    parser.add_argument("--epochs", help="Number of epochs", type=int, default=100)
+    parser.add_argument("--batch", help="Batch size", type=int, default=256)
     # Preprocessing
     parser.add_argument("--bound", help="Filter entries outside the boundaries", action="store_true")
     parser.add_argument("--normalize", help="Use a normalization layer", action="store_true")
@@ -118,8 +121,8 @@ def __main__():
             )
 
     # Training
-    num_epochs = 100
-    batch_size = 256
+    num_epochs = arguments.epochs
+    batch_size = arguments.batch
     training_history = model.fit(
             data[:test_point],
             labels[:test_point],

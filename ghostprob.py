@@ -26,6 +26,7 @@ def command_line():
     parser = argparse.ArgumentParser()
     parser.add_argument("-f", "--filename", help="File with validator data", type=str, required=True)
     parser.add_argument("--bound", help="Filter entries outside the boundaries", action="store_true")
+    parser.add_argument("--normalize", help="Use a normalization layer", action="store_true")
     return parser.parse_args()
 
 
@@ -91,10 +92,19 @@ def __main__():
 
     # Model
     features = len(columns)
-    model = tf.keras.Sequential([
-        tf.keras.layers.Dense(units=32, input_dim=features, activation="relu"),
-        tf.keras.layers.Dense(units=1)
-        ])
+    if arguments.normalization:
+        normalization_layer = tf.keras.layers.Normalization()
+        normalization_layer.adapt(data[:test_point])
+        model = tf.keras.Sequential([
+            normalization_layer,
+            tf.keras.layers.Dense(units=32, input_dim=features, activation="relu"),
+            tf.keras.layers.Dense(units=1)
+            ])
+    else:
+        model = tf.keras.Sequential([
+            tf.keras.layers.Dense(units=32, input_dim=features, activation="relu"),
+            tf.keras.layers.Dense(units=1)
+            ])
     model.summary()
     model.compile(
             optimizer="adam",

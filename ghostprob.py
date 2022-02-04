@@ -1,7 +1,7 @@
 import argparse
 import numpy as np
 import tensorflow as tf
-import matplotlib.pyplt as plt
+import matplotlib.pyplot as plt
 from ROOT import TFile, RDataFrame
 
 

@@ -1,6 +1,7 @@
 import argparse
 import numpy as np
 import tensorflow as tf
+import matplotlib.pyplt as plt
 from ROOT import TFile, RDataFrame
 
 
@@ -25,8 +26,11 @@ bounds = {"x": (-10., 10.),
 def command_line():
     parser = argparse.ArgumentParser()
     parser.add_argument("-f", "--filename", help="File with validator data", type=str, required=True)
+    # Preprocessing
     parser.add_argument("--bound", help="Filter entries outside the boundaries", action="store_true")
     parser.add_argument("--normalize", help="Use a normalization layer", action="store_true")
+    # Analysis
+    parser.add_argument("--plot", help="Plot accuracy over time", action="store_true")
     return parser.parse_args()
 
 
@@ -128,6 +132,16 @@ def __main__():
     # Evaluation
     loss, accuracy = model.evaluate(data[test_point:], labels[test_point:], verbose=0)
     print(f"Loss: {loss}, Accuracy: {accuracy}")
+
+    # Plotting
+    if arguments.plot:
+        plt.plot(num_epochs, training_history.history["accuracy"], "b", label="Training accuracy")
+        plt.plot(num_epochs, training_history.history["val_accuracy"], "r", label="Validation accuracy")
+        plt.title("Accuracy")
+        plt.xlabel("Epochs")
+        plt.ylabel("Accuracy")
+        plt.legend(loc="lower right")
+        plt.show()
 
 if __name__ == "__main__":
     __main__()

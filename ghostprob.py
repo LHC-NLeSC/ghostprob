@@ -67,7 +67,7 @@ def __main__():
             labels =labels[index]
 
     # Split into real tracks and ghosts
-    data = np.hstack([data[i].reshape(len(np_df["p"]), 1) for i in range(len(data))])
+    data = np.hstack([data[i].reshape(len(np_df[0]), 1) for i in range(len(data))])
     data_tracks = data[labels == 0]
     data_ghosts = data[labels == 1]
     

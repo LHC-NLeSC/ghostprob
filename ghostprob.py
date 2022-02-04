@@ -57,9 +57,17 @@ def __main__():
     print(f"Entries in the table: {len(np_df['p'])}")
     labels = np_df["ghost"].astype(int)
     data = [np_df[column] for column in columns]
-    data = np.hstack([data[i].reshape(len(np_df["p"]), 1) for i in range(len(data))])
+
+    # Remove NaNs
+    for _, column in enumerate(data):
+        index = np.isfinite(column)
+        if len(np.unique(index)) == 2:
+            for j_col in range(len(data)):
+                data[j_col] = data[j_col][index]
+            labels =labels[index]
 
     # Split into real tracks and ghosts
+    data = np.hstack([data[i].reshape(len(np_df["p"]), 1) for i in range(len(data))])
     data_tracks = data[labels == 0]
     data_ghosts = data[labels == 1]
     

@@ -92,7 +92,7 @@ def __main__():
 
     # Model
     features = len(columns)
-    if arguments.normalization:
+    if arguments.normalize:
         normalization_layer = tf.keras.layers.Normalization()
         normalization_layer.adapt(data[:test_point])
         model = tf.keras.Sequential([

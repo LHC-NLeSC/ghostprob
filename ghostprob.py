@@ -162,6 +162,7 @@ def __main__():
 
     # Save model
     if arguments.save:
+        print("Saving model to disk")
         model.save("ghostprob.h5")
 
 

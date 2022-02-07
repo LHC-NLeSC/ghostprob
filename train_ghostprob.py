@@ -1,7 +1,11 @@
 import math
 import numpy as np
 import tensorflow as tf
+
+from os import environ
 from ROOT import TFile, RDataFrame
+
+environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
 kalman_file = TFile("../data/PrCheckerPlots.root")
 columns = ["x", "y", "tx", "ty", "best_qop", "best_pt", "kalman_ip_chi2",
@@ -99,7 +103,9 @@ model = tf.keras.models.Sequential([
   tf.keras.layers.Dropout(0.1),
   tf.keras.layers.Dense(n_output, activation='sigmoid')
 ])
+print()
 model.summary()
+print()
 
 loss_fn = tf.keras.losses.BinaryCrossentropy()
 

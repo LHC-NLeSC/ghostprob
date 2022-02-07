@@ -2,8 +2,11 @@ import argparse
 import numpy as np
 import tensorflow as tf
 import matplotlib.pyplot as plt
+
+from os import environ
 from ROOT import TFile, RDataFrame
 
+environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
 # Columns to use for training
 columns = ["p", "z", "x", "y", "tx", "ty", "qop", "first_qop", "best_qop", "best_pt", "kalman_ip", "kalman_ipx",
@@ -113,7 +116,9 @@ def __main__():
             tf.keras.layers.Dense(units=32, input_dim=features, activation="relu"),
             tf.keras.layers.Dense(units=1)
             ])
+    print()
     model.summary()
+    print()
     model.compile(
             optimizer="adam",
             loss=tf.keras.losses.BinaryCrossentropy(from_logits=True),

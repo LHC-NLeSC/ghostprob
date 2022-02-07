@@ -109,12 +109,12 @@ def __main__():
         normalization_layer.adapt(data[:test_point])
         model = tf.keras.Sequential([
             normalization_layer,
-            tf.keras.layers.Dense(units=32, activation="relu"),
+            tf.keras.layers.Dense(units=((features + 1) / 2), activation="relu"),
             tf.keras.layers.Dense(units=1)
             ])
     else:
         model = tf.keras.Sequential([
-            tf.keras.layers.Dense(units=32, input_dim=features, activation="relu"),
+            tf.keras.layers.Dense(units=((features + 1) / 2), input_dim=features, activation="relu"),
             tf.keras.layers.Dense(units=1)
             ])
     print()

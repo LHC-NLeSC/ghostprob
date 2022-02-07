@@ -30,8 +30,8 @@ def command_line():
     parser = argparse.ArgumentParser()
     parser.add_argument("-f", "--filename", help="File with validator data", type=str, required=True)
     # Parameters
-    parser.add_argument("--epochs", help="Number of epochs", type=int, default=100)
-    parser.add_argument("--batch", help="Batch size", type=int, default=256)
+    parser.add_argument("--epochs", help="Number of epochs", type=int, default=512)
+    parser.add_argument("--batch", help="Batch size", type=int, default=1024)
     # Preprocessing
     parser.add_argument("--bound", help="Filter entries outside the boundaries", action="store_true")
     parser.add_argument("--normalize", help="Use a normalization layer", action="store_true")

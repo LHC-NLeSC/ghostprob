@@ -144,6 +144,13 @@ def __main__():
     # Plotting
     if arguments.plot:
         epochs = np.arange(0, num_epochs)
+        plt.plot(epochs, training_history.history["loss"], "bo", label="Training loss")
+        plt.plot(epochs, training_history.history["val_loss"], "ro", label="Validation loss")
+        plt.title("Loss")
+        plt.xlabel("Epochs")
+        plt.ylabel("Loss")
+        plt.legend(loc="lower right")
+        plt.show()
         plt.plot(epochs, training_history.history["accuracy"], "b", label="Training accuracy")
         plt.plot(epochs, training_history.history["val_accuracy"], "r", label="Validation accuracy")
         plt.title("Accuracy")

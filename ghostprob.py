@@ -37,6 +37,7 @@ def command_line():
     parser.add_argument("--normalize", help="Use a normalization layer", action="store_true")
     # Analysis
     parser.add_argument("--plot", help="Plot accuracy over time", action="store_true")
+    parser.add_argument("--save", help="Save the trained model to disk", action="store_true")
     return parser.parse_args()
 
 
@@ -158,6 +159,11 @@ def __main__():
         plt.ylabel("Accuracy")
         plt.legend(loc="lower right")
         plt.show()
+
+    # Save model
+    if arguments.save:
+        model.save("ghostprob.h5")
+
 
 if __name__ == "__main__":
     __main__()

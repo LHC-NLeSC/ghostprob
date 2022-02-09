@@ -76,7 +76,7 @@ def __main__():
         if len(np.unique(index)) == 2:
             for j_col in range(len(data)):
                 data[j_col] = data[j_col][index]
-            labels =labels[index]
+            labels = labels[index]
 
     # Split into real tracks and ghosts
     data = np.hstack([data[i].reshape(len(data[0]), 1) for i in range(len(data))])

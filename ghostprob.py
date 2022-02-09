@@ -1,8 +1,12 @@
 import argparse
 import numpy as np
 import tensorflow as tf
+import matplotlib.pyplot as plt
+
+from os import environ
 from ROOT import TFile, RDataFrame
 
+environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
 # Columns to use for training
 columns = ["p", "z", "x", "y", "tx", "ty", "qop", "first_qop", "best_qop", "best_pt", "kalman_ip", "kalman_ipx",
@@ -25,7 +29,15 @@ bounds = {"x": (-10., 10.),
 def command_line():
     parser = argparse.ArgumentParser()
     parser.add_argument("-f", "--filename", help="File with validator data", type=str, required=True)
+    # Parameters
+    parser.add_argument("--epochs", help="Number of epochs", type=int, default=512)
+    parser.add_argument("--batch", help="Batch size", type=int, default=1024)
+    # Preprocessing
     parser.add_argument("--bound", help="Filter entries outside the boundaries", action="store_true")
+    parser.add_argument("--normalize", help="Use a normalization layer", action="store_true")
+    # Analysis
+    parser.add_argument("--plot", help="Plot accuracy over time", action="store_true")
+    parser.add_argument("--save", help="Save the trained model to disk", action="store_true")
     return parser.parse_args()
 
 
@@ -57,9 +69,17 @@ def __main__():
     print(f"Entries in the table: {len(np_df['p'])}")
     labels = np_df["ghost"].astype(int)
     data = [np_df[column] for column in columns]
-    data = np.hstack([data[i].reshape(len(np_df["p"]), 1) for i in range(len(data))])
+
+    # Remove NaNs
+    for _, column in enumerate(data):
+        index = np.isfinite(column)
+        if len(np.unique(index)) == 2:
+            for j_col in range(len(data)):
+                data[j_col] = data[j_col][index]
+            labels =labels[index]
 
     # Split into real tracks and ghosts
+    data = np.hstack([data[i].reshape(len(data[0]), 1) for i in range(len(data))])
     data_tracks = data[labels == 0]
     data_ghosts = data[labels == 1]
     
@@ -83,11 +103,23 @@ def __main__():
 
     # Model
     features = len(columns)
-    model = tf.keras.Sequential([
-        tf.keras.layers.Dense(units=32, input_dim=features, activation="relu"),
-        tf.keras.layers.Dense(units=1)
-        ])
+    if arguments.normalize:
+        print("Normalization enabled")
+        normalization_layer = tf.keras.layers.Normalization()
+        normalization_layer.adapt(data[:test_point])
+        model = tf.keras.Sequential([
+            normalization_layer,
+            tf.keras.layers.Dense(units=((features + 1) / 2), activation="relu"),
+            tf.keras.layers.Dense(units=1)
+            ])
+    else:
+        model = tf.keras.Sequential([
+            tf.keras.layers.Dense(units=((features + 1) / 2), input_dim=features, activation="relu"),
+            tf.keras.layers.Dense(units=1)
+            ])
+    print()
     model.summary()
+    print()
     model.compile(
             optimizer="adam",
             loss=tf.keras.losses.BinaryCrossentropy(from_logits=True),
@@ -95,8 +127,8 @@ def __main__():
             )
 
     # Training
-    num_epochs = 100
-    batch_size = 256
+    num_epochs = arguments.epochs
+    batch_size = arguments.batch
     training_history = model.fit(
             data[:test_point],
             labels[:test_point],
@@ -109,6 +141,30 @@ def __main__():
     # Evaluation
     loss, accuracy = model.evaluate(data[test_point:], labels[test_point:], verbose=0)
     print(f"Loss: {loss}, Accuracy: {accuracy}")
+
+    # Plotting
+    if arguments.plot:
+        epochs = np.arange(0, num_epochs)
+        plt.plot(epochs, training_history.history["loss"], "bo", label="Training loss")
+        plt.plot(epochs, training_history.history["val_loss"], "ro", label="Validation loss")
+        plt.title("Loss")
+        plt.xlabel("Epochs")
+        plt.ylabel("Loss")
+        plt.legend(loc="lower right")
+        plt.show()
+        plt.plot(epochs, training_history.history["accuracy"], "b", label="Training accuracy")
+        plt.plot(epochs, training_history.history["val_accuracy"], "r", label="Validation accuracy")
+        plt.title("Accuracy")
+        plt.xlabel("Epochs")
+        plt.ylabel("Accuracy")
+        plt.legend(loc="lower right")
+        plt.show()
+
+    # Save model
+    if arguments.save:
+        print("Saving model to disk")
+        model.save("ghostprob.h5")
+
 
 if __name__ == "__main__":
     __main__()

@@ -1,3 +1,4 @@
+import argparse
 import math
 import numpy as np
 import tensorflow as tf
@@ -9,7 +10,28 @@ from ROOT import TFile, RDataFrame
 
 environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
-kalman_file = TFile("../data/PrCheckerPlots.root")
+def command_line():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-f", "--filename", help="File with validator data", type=str, required=True)
+    # Parameters
+    parser.add_argument("--epochs", help="Number of epochs", type=int, default=512)
+    parser.add_argument("--batch", help="Batch size", type=int, default=1024)
+    # Preprocessing
+    parser.add_argument("--bound", help="Filter entries outside the boundaries", action="store_true")
+    parser.add_argument("--normalize", help="Use a normalization layer", action="store_true")
+    # Analysis
+    parser.add_argument("--plot", help="Plot accuracy over time", action="store_true")
+    parser.add_argument("--save", help="Save the trained model to disk", action="store_true")
+    return parser.parse_args()
+
+
+def norm(x):
+    return x / math.sqrt(1. + x * x)
+
+
+arguments = command_line()
+
+kalman_file = TFile(arguments.filename)
 columns = ["x", "y", "tx", "ty", "best_qop", "best_pt", "kalman_ip_chi2",
            "kalman_docaz", "chi2", "chi2V", "chi2UT", "chi2T",
            "ndof", "ndofV", "ndofT", "nUT", "ghost"]
@@ -26,10 +48,12 @@ bounds = {"x": (-10., 10.),
           "chi2Vdof": (0, 150),
           "chi2Tdof": (0, 150)}
 
-for column in columns:
-    if column in bounds:
-        lower, upper = bounds[column]
-        df = df.Filter("{0} > {1} && {0} < {2}".format(column, lower, upper))
+
+if arguments.bound:
+    for column in columns:
+        if column in bounds:
+            lower, upper = bounds[column]
+            df = df.Filter("{0} > {1} && {0} < {2}".format(column, lower, upper))
 
 np_df = df.AsNumpy()
 
@@ -48,14 +72,10 @@ for i_col, column in enumerate(data_columns):
         labels_all = labels_all[index]
 
 
-def norm(x):
-    return x / math.sqrt(1. + x * x)
-
-
-norm_v = np.vectorize(norm)
-
-# Scale data to [-1., 1.]
-# data_columns = [norm_v(c) for c in data_columns]
+if arguments.normalize:
+    norm_v = np.vectorize(norm)
+    # Scale data to [-1., 1.]
+    data_columns = [norm_v(c) for c in data_columns]
 
 n_rows = len(data_columns[0])
 
@@ -116,14 +136,33 @@ model.compile(optimizer='adam',
               loss=loss_fn,
               metrics=['accuracy'])
 
-model.fit(data_train, labels_train, batch_size=1000, epochs=1000, verbose=0)
+training_history = model.fit(data_train, labels_train, batch_size=1000, epochs=1000, verbose=0)
 
 loss, accuracy = model.evaluate(data_test, labels_test, verbose=0)
 print(f"Loss: {loss}, Accuracy: {accuracy}")
 
-print("Saving model to disk")
-model.save("train_ghostprob_model.h5")
-print("Saving model to ONNX format")
-input_signature = [tf.TensorSpec(input.shape, input.dtype) for input in model.inputs]
-model_onnx, _ = tf2onnx.convert.from_keras(model, input_signature)
-onnx.save(model_onnx, "train_ghostprob_model.onnx")
+# Plotting
+if arguments.plot:
+    epochs = np.arange(0, num_epochs)
+    plt.plot(epochs, training_history.history["loss"], "bo", label="Training loss")
+    plt.plot(epochs, training_history.history["val_loss"], "ro", label="Validation loss")
+    plt.title("Loss")
+    plt.xlabel("Epochs")
+    plt.ylabel("Loss")
+    plt.legend(loc="lower right")
+    plt.show()
+    plt.plot(epochs, training_history.history["accuracy"], "b", label="Training accuracy")
+    plt.plot(epochs, training_history.history["val_accuracy"], "r", label="Validation accuracy")
+    plt.title("Accuracy")
+    plt.xlabel("Epochs")
+    plt.ylabel("Accuracy")
+    plt.legend(loc="lower right")
+    plt.show()
+
+if arguments,save:
+    print("Saving model to disk")
+    model.save("train_ghostprob_model.h5")
+    print("Saving model to ONNX format")
+    input_signature = [tf.TensorSpec(input.shape, input.dtype) for input in model.inputs]
+    model_onnx, _ = tf2onnx.convert.from_keras(model, input_signature)
+    onnx.save(model_onnx, "train_ghostprob_model.onnx")

@@ -1,6 +1,8 @@
 import math
 import numpy as np
 import tensorflow as tf
+import onnx
+import tf2onnx
 
 from os import environ
 from ROOT import TFile, RDataFrame
@@ -118,3 +120,10 @@ model.fit(data_train, labels_train, batch_size=1000, epochs=1000, verbose=0)
 
 loss, accuracy = model.evaluate(data_test, labels_test, verbose=0)
 print(f"Loss: {loss}, Accuracy: {accuracy}")
+
+print("Saving model to disk")
+model.save("train_ghostprob_model.h5")
+print("Saving model to ONNX format")
+input_signature = [tf.TensorSpec(input.shape, input.dtype) for input in model.inputs]
+model_onnx, _ = tf2onnx.convert.from_keras(model, input_signature)
+onnx.save(model_onnx, "train_ghostprob_model.onnx")

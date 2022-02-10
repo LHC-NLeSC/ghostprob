@@ -139,7 +139,7 @@ model.compile(optimizer='adam',
 
 num_epochs = arguments.epochs
 batch_size = arguments.batch
-training_history = model.fit(data_train, labels_train, batch_size=batch_size, epochs=num_epochs, verbose=0)
+training_history = model.fit(data_train, labels_train, validation_split=0.2, batch_size=batch_size, epochs=num_epochs, verbose=0)
 
 loss, accuracy = model.evaluate(data_test, labels_test, verbose=0)
 print(f"Loss: {loss}, Accuracy: {accuracy}")

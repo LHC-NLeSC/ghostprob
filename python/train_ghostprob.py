@@ -159,7 +159,7 @@ if arguments.plot:
     plt.legend(loc="lower right")
     plt.show()
 
-if arguments,save:
+if arguments.save:
     print("Saving model to disk")
     model.save("train_ghostprob_model.h5")
     print("Saving model to ONNX format")

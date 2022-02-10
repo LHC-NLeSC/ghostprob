@@ -1,6 +1,8 @@
 import argparse
 import numpy as np
 import tensorflow as tf
+import onnx
+import tf2onnx
 import matplotlib.pyplot as plt
 
 from os import environ
@@ -164,6 +166,10 @@ def __main__():
     if arguments.save:
         print("Saving model to disk")
         model.save("ghostprob.h5")
+        print("Saving model to ONNX format")
+        input_signature = [tf.TensorSpec([features], tf.float32, name="columns")]
+        model_onnx, _ = tf2oonx.convert.from_keras(model, input_signature)
+        onnx.save(model_onnx, "ghostprob.onnx")
 
 
 if __name__ == "__main__":

@@ -168,7 +168,7 @@ def __main__():
         model.save("ghostprob.h5")
         print("Saving model to ONNX format")
         input_signature = [tf.TensorSpec([features], tf.float32, name="columns")]
-        model_onnx, _ = tf2oonx.convert.from_keras(model, input_signature)
+        model_onnx, _ = tf2onnx.convert.from_keras(model, input_signature)
         onnx.save(model_onnx, "ghostprob.onnx")
 
 

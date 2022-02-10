@@ -1,2 +1,4 @@
 tensorflow
 matplotlib
+onnx
+tf2onnx

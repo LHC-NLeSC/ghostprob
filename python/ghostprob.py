@@ -165,11 +165,11 @@ def __main__():
     # Save model
     if arguments.save:
         print("Saving model to disk")
-        model.save("ghostprob.h5")
+        model.save("ghostprob_model.h5")
         print("Saving model to ONNX format")
-        input_signature = [tf.TensorSpec([features], tf.float32, name="columns")]
+        input_signature = [tf.TensorSpec(input.shape, input.dtype) for input in model.inputs]
         model_onnx, _ = tf2onnx.convert.from_keras(model, input_signature)
-        onnx.save(model_onnx, "ghostprob.onnx")
+        onnx.save(model_onnx, "ghostprob_model.onnx")
 
 
 if __name__ == "__main__":

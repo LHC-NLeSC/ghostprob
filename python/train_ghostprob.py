@@ -51,6 +51,7 @@ bounds = {"x": (-10., 10.),
 
 
 if arguments.bound:
+    print("Filtering out of bounds entries.")
     for column in columns:
         if column in bounds:
             lower, upper = bounds[column]
@@ -64,6 +65,10 @@ columns = ["p"] + columns[:-1]
 
 data_columns = [np_df[c] for c in columns]
 
+print(f"Columns in the table: {len(np_df)}")
+print(f"Columns for training: {len(columns)}")
+print(f"Entries in the table: {len(np_df['p'])}")
+
 # Remove NaNs
 for i_col, column in enumerate(data_columns):
     index = np.isfinite(column)
@@ -74,6 +79,7 @@ for i_col, column in enumerate(data_columns):
 
 
 if arguments.normalize:
+    print("Normalization enabled")
     norm_v = np.vectorize(norm)
     # Scale data to [-1., 1.]
     data_columns = [norm_v(c) for c in data_columns]
@@ -90,6 +96,8 @@ n_ghosts = data_ghosts.shape[0]
 
 # 50/50 ghosts and tracks
 data_tracks = data_tracks[:n_ghosts]
+
+print(f"Number of real tracks ({len(data_tracks)}) and ghost tracks ({n_ghosts})")
 
 data = np.vstack((data_tracks, data_ghosts))
 
@@ -115,6 +123,9 @@ data_test = data[:split]
 data_train = data[split:]
 labels_test = labels[:split]
 labels_train = labels[split:]
+
+print(f"Training set size: {split}")
+print(f"Test set size: {len(data_test)}")
 
 n_input = data.shape[1]
 n_hidden = int(1.5 * n_input)

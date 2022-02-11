@@ -163,7 +163,7 @@ if arguments.plot:
     plt.title("Loss")
     plt.xlabel("Epochs")
     plt.ylabel("Loss")
-    plt.legend(loc="lower right")
+    plt.legend(loc="upper right")
     plt.show()
     plt.plot(epochs, training_history.history["accuracy"], "b", label="Training accuracy")
     plt.plot(epochs, training_history.history["val_accuracy"], "r", label="Validation accuracy")

@@ -245,7 +245,7 @@ bool GhostDetection::infer(int32_t nevent)
 
 int main(int argc, char* argv[])
 {
-    GhostDetection ghostinfer("ghost_nn.onnx");
+    GhostDetection ghostinfer("../data/ghost_nn.onnx");
     ghostinfer.build();
     ghostinfer.initialize("PrCheckerPlots.root");
     for(int32_t i = 0; i < 1000; ++i)

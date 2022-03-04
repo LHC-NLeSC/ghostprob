@@ -1,8 +1,9 @@
 all	:	GhostDetection.o
-	$(CC) $(CFLAGS) -o main GhostDetection.o
+	$(CXX) $(CXXFLAGS) -o main GhostDetection.o $(LDFLAGS)
 
 GhostDetection.o: GhostDetection.cpp
-	$(CC) $(CFLAGS) -c GhostDetection.cpp
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c GhostDetection.cpp
 
 
-clean: rm main GhostDetection.o
+clean: 
+	rm main GhostDetection.o

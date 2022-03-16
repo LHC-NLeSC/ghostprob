@@ -15,6 +15,10 @@
 #include "TTree.h"
 #include "TFile.h"
 
+// Constants
+const bool useFP16 = true;
+
+
 struct InferDeleter
 {
     template <typename T>
@@ -170,6 +174,12 @@ bool GhostDetection::build()
         return false;
     }
 
+    // If necessary check that the GPU supports lower precision
+    if ( useFP16 && !builder->platformHasFastFp16() )
+    {
+        return false;
+    }
+
     // Create (empty) network
     const auto explicitBatch = 1U << static_cast<uint32_t>(nvinfer1::NetworkDefinitionCreationFlag::kEXPLICIT_BATCH);
     auto network = std::unique_ptr<nvinfer1::INetworkDefinition, InferDeleter>(builder->createNetworkV2(explicitBatch));
@@ -185,6 +195,10 @@ bool GhostDetection::build()
         return false;
     }
     config->setMaxWorkspaceSize(1024 * (1 << 20));
+    if ( useFP16 )
+    {
+        config->setFlag(nvinfer1::BuilderFlag::kFP16);
+    }
 
     nvinfer1::IOptimizationProfile* profile = builder->createOptimizationProfile();
     auto input_dims = nvinfer1::Dims2(1, mInputSize);

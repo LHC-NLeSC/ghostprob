@@ -2,3 +2,5 @@ tensorflow
 matplotlib
 onnx
 tf2onnx
+numpy
+ROOT

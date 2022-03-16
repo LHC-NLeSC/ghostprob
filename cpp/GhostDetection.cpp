@@ -4,6 +4,7 @@
 #include <iostream>
 #include <memory>
 #include <sstream>
+#include <chrono>
 
 #include <cuda_runtime_api.h>
 #include "NvInfer.h"
@@ -23,6 +24,24 @@ struct InferDeleter
         {
             obj->destroy();
         }
+    }
+};
+
+struct InferenceResult
+{
+    int32_t true_positives;
+    int32_t true_negatives;
+    int32_t false_positives;
+    int32_t false_negatives;
+
+    int32_t n_events()
+    {
+        return true_positives + true_negatives + false_positives + false_negatives;
+    }
+
+    float accuracy()
+    {
+        return float(true_positives + true_negatives)/(float)n_events();
     }
 };
 
@@ -46,7 +65,7 @@ class GhostDetection
 
         bool initialize(const std::string& rootFile);
 
-        bool infer(const int32_t nevent);
+        bool infer(const int32_t nevent, InferenceResult& result);
 
     private:
 
@@ -140,12 +159,6 @@ bool GhostDetection::initialize(const std::string& rootFile)
     {
         return false;
     }
-//    auto input_idx  = mEngine->getBindingIndex("dense_input");
-//    auto output_idx = mEngine->getBindingIndex("dense");
-//    std::cerr<<"INPUT INDEX :"<<input_idx<<std::endl;
-//    std::cerr<<"OUTPUT INDEX:"<<output_idx<<std::endl;
-//    auto input_dims = nvinfer1::Dims2(1, mInputSize);
-//    mContext->setBindingDimensions(input_idx, input_dims);
 }
 
 bool GhostDetection::build()
@@ -228,7 +241,7 @@ bool GhostDetection::build()
 }
 
 
-bool GhostDetection::infer(int32_t nevent)
+bool GhostDetection::infer(int32_t nevent, InferenceResult& result)
 {
     // Read next event in ROOT file
     if(mEventTree == nullptr)
@@ -246,7 +259,7 @@ bool GhostDetection::infer(int32_t nevent)
 
 
     // Memcpy from host input buffers to device input buffers
-    cudaMemcpy(mInputBufferHost, mInputBufferDevice, mInputSize * sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpy(mInputBufferDevice, mInputBufferHost, mInputSize * sizeof(float), cudaMemcpyHostToDevice);
 
     void* buffers[2];
     buffers[0] = mInputBufferDevice;
@@ -259,10 +272,23 @@ bool GhostDetection::infer(int32_t nevent)
         return false;
     }
 
+    unsigned truth = ((unsigned*)mOutputBufferHost)[0];
+ 
     // Memcpy from host input buffers to device input buffers
-    cudaMemcpy(mOutputBufferDevice, mOutputBufferHost, mOutputSize * sizeof(float), cudaMemcpyDeviceToHost);
+    cudaMemcpy(mOutputBufferHost, mOutputBufferDevice, mOutputSize * sizeof(float), cudaMemcpyDeviceToHost);
 
-    std::cerr<<"Inference result for evt "<<nevent<<": "<<*(static_cast<int32_t*>(mOutputBufferHost))<<std::endl;
+    float pred = ((float*)mOutputBufferHost)[0] < 0.5 ? 0 : 1;
+
+    if(truth == pred)
+    {
+        result.true_positives += truth;
+        result.true_negatives += (1 - truth);
+    }
+    else
+    {
+        result.false_positives += pred;
+        result.false_negatives += truth;
+    }
 
     return true;
 }
@@ -273,8 +299,26 @@ int main(int argc, char* argv[])
     GhostDetection ghostinfer("../data/ghost_nn.onnx");
     ghostinfer.build();
     ghostinfer.initialize("../data/PrCheckerPlots.root");
+
+    InferenceResult result;
+
+    auto start = std::chrono::high_resolution_clock::now();
+
     for(int32_t i = 0; i < 10000; ++i)
     {
-        ghostinfer.infer(i);
+        ghostinfer.infer(i, result);
     }
+
+    auto stop = std::chrono::high_resolution_clock::now();
+
+    std::cout<<".............................................."<<std::endl;
+    std::cout<<"No. true positives:  "<<result.true_positives<<std::endl;
+    std::cout<<"No. true negatives:  "<<result.true_negatives<<std::endl;
+    std::cout<<"No. false positives: "<<result.false_positives<<std::endl;
+    std::cout<<"No. false negatives: "<<result.false_negatives<<std::endl;
+    std::cout<<".............................................."<<std::endl;
+    std::cout<<"accuracy:" <<result.accuracy()<<std::endl<<std::endl;
+
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
+    std::cout<<"Duration: "<<duration.count()<<" microsec."<<std::endl;
 }

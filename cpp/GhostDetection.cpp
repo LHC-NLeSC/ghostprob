@@ -292,36 +292,74 @@ bool FileInputDataProvider::fill_device_buffer(void* inputBufferDevice)
     return true;
 }
 
-/*class GPUInputDataProvider: public InputDataProvider
+class GPUInputDataProvider: public InputDataProvider
 {
     public:
 
-        GPUInputDataProvider();
+        GPUInputDataProvider(const NetworkInputDescriptor* network);
 
-        bool load(const std::string& rootFile, const std::string& treeName, const std::vector<std::string>& branchNames, float* buffer);
+        ~GPUInputDataProvider();
 
-        bool read_event(const int32_t event);
+        bool load(const std::string& rootFile, const std::string& treeName);
 
-        bool fill_device_buffer(void* buffer, int32_t size);
+        int32_t read_event(const int32_t event);
+
+        bool fill_device_buffer(void* buffer);
 
     private:
 
-        float* mInputBuffer;
-        float* mOutputBuffer;
+        void* mInputBuffer;
+        void* mOutputBuffer;
+        std::vector<int32_t> truths;
+        int32_t index;
+        int32_t stride;
 };
 
-bool GPUInputDataProvider::load(const std::string& rootFile, const std::string& treeName, const std::vector<std::string>& branchNames, float* buffer)
+GPUInputDataProvider::GPUInputDataProvider(const NetworkInputDescriptor* network): InputDataProvider(network), 
+mInputBuffer(nullptr), mOutputBuffer(nullptr), index(-1){}
+
+GPUInputDataProvider::~GPUInputDataProvider()
 {
-    FileInputDataProvider fileInput;
-    fileInput.load(rootFile, treeName, branchNames, buffer);
+    if(mInputBuffer != nullptr)
+    {
+        cudaFree(mInputBuffer);
+        mInputBuffer = nullptr;
+    }
+    if(mOutputBuffer != nullptr)
+    {
+        cudaFree(mOutputBuffer);
+        mOutputBuffer = nullptr;
+    }
+    truths.clear();
+}
+
+bool GPUInputDataProvider::load(const std::string& rootFile, const std::string& treeName)
+{
+    auto nevts = 10000;
+    auto networkInputDescriptor = this->mNetworkDescriptor;
+    stride = networkInputDescriptor->get_branch_names().size() * sizeof(float);
+    FileInputDataProvider fileInput(networkInputDescriptor);
+    cudaMalloc(&mInputBuffer, nevts * stride);
+    fileInput.load(rootFile, treeName);
     for(int32_t i = 0; i < nevts; ++i)
     {
-        fileInput.read_event(i);
-
+        auto result = fileInput.read_event(i);
+        truths.push_back(result);
+        fileInput.fill_device_buffer(mInputBuffer + i * stride);
     }
-};*/
+    return true;
+}
 
+int32_t GPUInputDataProvider::read_event(int32_t event)
+{
+    index = event;
+    return truths[index];
+}
 
+bool GPUInputDataProvider::fill_device_buffer(void* buffer)
+{
+    cudaMemcpy(buffer, mInputBuffer + index * stride, stride, cudaMemcpyDeviceToDevice);
+}
 
 
 
@@ -499,7 +537,8 @@ bool GhostDetection::infer(int32_t nevent, InferenceResult& result)
 int main(int argc, char* argv[])
 {
     NetworkInputDescriptor* networkDescriptor = new GhostNetworkInputDescriptor();
-    InputDataProvider* inputDataProvider = new FileInputDataProvider(networkDescriptor);
+//    InputDataProvider* inputDataProvider = new FileInputDataProvider(networkDescriptor);
+    InputDataProvider* inputDataProvider = new GPUInputDataProvider(networkDescriptor);
     GhostDetection ghostinfer("../data/ghost_nn.onnx", inputDataProvider);
     ghostinfer.build();
     ghostinfer.initialize("../data/PrCheckerPlots.root","kalman_validator/kalman_ip_tree");

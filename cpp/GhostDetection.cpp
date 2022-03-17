@@ -72,7 +72,7 @@ class NetworkInputDescriptor
         virtual unsigned host_buffer_size() const=0;
 
         // Do the magic mapping the root file variables to the NN input
-        virtual void fill_host_buffer(const float* root_buffer, float* host_buffer) const=0;
+        virtual void fill_host_buffer(const void* root_buffer, void* host_buffer) const=0;
 };
 
 NetworkInputDescriptor::~NetworkInputDescriptor(){}
@@ -90,7 +90,7 @@ class GhostNetworkInputDescriptor: public NetworkInputDescriptor
         unsigned host_buffer_size() const;
 
         // Do the magic mapping the root file variables to the NN input
-        void fill_host_buffer(const float* root_buffer, float* host_buffer) const;
+        void fill_host_buffer(const void* root_buffer, void* host_buffer) const;
 };
 
 GhostNetworkInputDescriptor::GhostNetworkInputDescriptor(){}
@@ -99,25 +99,25 @@ GhostNetworkInputDescriptor::~GhostNetworkInputDescriptor(){}
 
 std::vector<std::string> GhostNetworkInputDescriptor::get_branch_names() const
 {
-    return std::vector<std::string>({"x_f", "y_f", "tx_f", "ty_f", "best_qop_f", "best_pt_f", "kalman_ip_chi2_f", "kalman_docaz_f", "chi2_f", "chi2V_f",
-                                    "chi2UT_f", "chi2T_f", "ndof_i", "ndofV_i", "ndofT_i", "nUT_i"});
+    return std::vector<std::string>({"x_f", "y_f", "tx_f", "ty_f", "best_qop_f", "best_pt_f", "kalman_ip_chi2_f", 
+                                        "kalman_docaz_f", "chi2_f", "chi2V_f", "chi2UT_f", "chi2T_f", 
+                                        "ndof_i", "ndofV_i", "ndofT_i", "nUT_i"});
 }
 
 unsigned GhostNetworkInputDescriptor::host_buffer_size() const
 {
-    return 17 * sizeof(float);
+    return 13 * sizeof(float) + 4 * sizeof(int32_t);
 }
 
-void GhostNetworkInputDescriptor::fill_host_buffer(const float* root_buffer, float* host_buffer) const
+void GhostNetworkInputDescriptor::fill_host_buffer(const void* root_buffer, void* host_buffer) const
 {
-    host_buffer[0] = 1./ std::abs(root_buffer[4]);
-    std::memcpy((void*)(host_buffer + 1), (const void*)root_buffer, 12 * sizeof(float));
-
-    host_buffer[13] = (float)(*(int32_t*)(root_buffer + 12));
-    host_buffer[14] = (float)(*(int32_t*)(root_buffer + 13));
-    host_buffer[15] = (float)(*(int32_t*)(root_buffer + 14));
-    host_buffer[16] = (float)(*(int32_t*)(root_buffer + 15));
-
+    ((float*)host_buffer)[0] = 1./ std::abs(((const float*) root_buffer)[4]);
+    std::memcpy(host_buffer + sizeof(float), root_buffer, 12 * sizeof(float));
+    const int32_t* int_buffer = (const int32_t*)(root_buffer + 12 * sizeof(float));
+    ((float*)host_buffer)[13] = (float)(int_buffer[0]);
+    ((float*)host_buffer)[14] = (float)(int_buffer[1]);
+    ((float*)host_buffer)[15] = (float)(int_buffer[2]);
+    ((float*)host_buffer)[16] = (float)(int_buffer[3]);
 }
 
 class InputDataProvider
@@ -128,16 +128,18 @@ class InputDataProvider
 
         virtual ~InputDataProvider();
 
+        const NetworkInputDescriptor* network_input() const;
+
         virtual bool load(const std::string& rootFile, const std::string& treeName)=0;
 
-        virtual bool read_event(const int32_t event)=0;
+        virtual int32_t read_event(const int32_t event)=0;
 
         virtual bool fill_device_buffer(void* buffer)=0;
 
     protected:
 
-        bool open(  const std::string& rootFile, const std::string treeName, const std::vector<std::string>& branchNames,
-                    float* inputBuffer, float* outputBuffer);
+        bool open(  const std::string& rootFile, const std::string treeName, 
+                    const std::vector<std::string>& branchNames, void* inputBuffer, void* outputBuffer);
 
         bool close();
 
@@ -147,30 +149,39 @@ class InputDataProvider
     
 };
 
-InputDataProvider::InputDataProvider(const NetworkInputDescriptor* network): mNetworkDescriptor(network), mRootFile(nullptr), mEventTree(nullptr){}
+InputDataProvider::InputDataProvider(const NetworkInputDescriptor* network): mNetworkDescriptor(network), 
+                                        mRootFile(nullptr), mEventTree(nullptr){}
 
 InputDataProvider::~InputDataProvider()
 {
     close();
 }
 
+const NetworkInputDescriptor* InputDataProvider::network_input() const
+{
+    return mNetworkDescriptor;
+}
+
 bool InputDataProvider::open(const std::string& rootFile, const std::string treeName, const std::vector<std::string>& branchNames, 
-                        float* inputBuffer, float* outputBuffer)
+                        void* inputBuffer, void* outputBuffer)
 {
     close();
     mRootFile = new TFile(rootFile.c_str());
     mEventTree = (TTree*)mRootFile->Get(treeName.c_str());
+    int32_t offset = 0;
     for(int32_t i = 0; i < branchNames.size(); ++i)
     {
         auto typechar = branchNames[i].back();
         auto branchName = branchNames[i].substr(0, branchNames[i].size()-2);
         if(typechar == 'i')
         {
-            mEventTree->SetBranchAddress(branchName.c_str(), (int32_t*)(&inputBuffer[i]));
+            mEventTree->SetBranchAddress(branchName.c_str(), (inputBuffer + offset));
+            offset += sizeof(int32_t);
         }
         else if(typechar == 'f')
         {
-            mEventTree->SetBranchAddress(branchName.c_str(), &inputBuffer[i]);
+            mEventTree->SetBranchAddress(branchName.c_str(), (inputBuffer + offset));
+            offset += sizeof(float);
         }
         else
         {
@@ -204,7 +215,7 @@ class FileInputDataProvider: public InputDataProvider
 
         bool load(const std::string& rootFile, const std::string& treeName);
 
-        bool read_event(const int32_t event);
+        int32_t read_event(const int32_t event);
 
         bool fill_device_buffer(void* buffer);
 
@@ -213,10 +224,14 @@ class FileInputDataProvider: public InputDataProvider
         void* mInputBuffer;
         void* mOutputBuffer;
         void* mTransferBuffer;
+        int32_t mTransferBufferSize;
 };
 
 FileInputDataProvider::FileInputDataProvider(const NetworkInputDescriptor* network):InputDataProvider(network),
-    mInputBuffer(nullptr), mOutputBuffer(nullptr){}
+    mInputBuffer(nullptr), mOutputBuffer(nullptr)
+{
+    mTransferBufferSize = network->get_branch_names().size() * sizeof(float);
+}
 
 FileInputDataProvider::~FileInputDataProvider()
 {
@@ -248,33 +263,32 @@ bool FileInputDataProvider::load(const std::string& rootFile, const std::string&
     {
         cudaFreeHost(mOutputBuffer);
     }
-    cudaHostAlloc(&mInputBuffer, sizeof(float), cudaHostAllocDefault);
+    cudaHostAlloc(&mOutputBuffer, sizeof(float), cudaHostAllocDefault);
 
     this->open(rootFile, treeName, branchNames, (float*)mInputBuffer, (float*)mOutputBuffer);
 
-    auto transferSize = this->mNetworkDescriptor->host_buffer_size();
     if(mTransferBuffer != nullptr)
     {
         cudaFreeHost(mTransferBuffer);
     }
-    cudaHostAlloc(&mTransferBuffer, transferSize, cudaHostAllocDefault);
+    cudaHostAlloc(&mTransferBuffer, mTransferBufferSize, cudaHostAllocDefault);
     return true;
 }
 
-bool FileInputDataProvider::read_event(int32_t event)
+int32_t FileInputDataProvider::read_event(int32_t event)
 {
     if(mEventTree == nullptr)
     {
         return false;
     }
     mEventTree->GetEntry(event);
-    return true;
+    return ((int32_t*)mOutputBuffer)[0];
 }
 
 bool FileInputDataProvider::fill_device_buffer(void* inputBufferDevice)
 {
-    this->mNetworkDescriptor->fill_host_buffer((float*)mInputBuffer, (float*)mTransferBuffer);
-    cudaMemcpy(inputBufferDevice, mTransferBuffer, this->mNetworkDescriptor->host_buffer_size() * sizeof(float), cudaMemcpyHostToDevice);
+    this->mNetworkDescriptor->fill_host_buffer(mInputBuffer, mTransferBuffer);
+    cudaMemcpy(inputBufferDevice, mTransferBuffer, mTransferBufferSize, cudaMemcpyHostToDevice);
     return true;
 }
 
@@ -346,6 +360,8 @@ mOutputBufferDevice(nullptr){}
 bool GhostDetection::initialize(const std::string& rootFile, const std::string& treeName)
 {
     mDataProvider->load(rootFile, treeName);
+    cudaMalloc(&mInputBufferDevice, mDataProvider->network_input()->host_buffer_size());
+    cudaMalloc(&mOutputBufferDevice, sizeof(float));
     // Create TensorRT context
     mContext = std::unique_ptr<nvinfer1::IExecutionContext, InferDeleter>(mEngine->createExecutionContext());
     if (!mContext)
@@ -446,7 +462,7 @@ bool GhostDetection::build()
 
 bool GhostDetection::infer(int32_t nevent, InferenceResult& result)
 {
-    mDataProvider->read_event(nevent);
+    auto truth = mDataProvider->read_event(nevent);
     mDataProvider->fill_device_buffer(mInputBufferDevice);
     void* buffers[2];
     buffers[0] = mInputBufferDevice;
@@ -459,14 +475,12 @@ bool GhostDetection::infer(int32_t nevent, InferenceResult& result)
         return false;
     }
 
-//    unsigned truth = ((unsigned*)mOutputBufferHost)[0];
-    unsigned truth = 0;
+    float prediction;
  
     // Memcpy from host input buffers to device input buffers
-//    cudaMemcpy(mOutputBufferHost, mOutputBufferDevice, mOutputSize * sizeof(float), cudaMemcpyDeviceToHost);
+    cudaMemcpy((void*)&prediction, mOutputBufferDevice, sizeof(float), cudaMemcpyDeviceToHost);
 
-//    float pred = ((float*)mOutputBufferHost)[0] < 0.5 ? 0 : 1;
-    float pred =0;
+    unsigned pred = prediction < 0.5 ? 0 : 1;
     if(truth == pred)
     {
         result.true_positives += truth;
@@ -511,4 +525,7 @@ int main(int argc, char* argv[])
 
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
     std::cout<<"Duration: "<<duration.count()<<" microsec."<<std::endl;
+
+    delete inputDataProvider;
+    delete networkDescriptor;
 }

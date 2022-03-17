@@ -16,7 +16,7 @@
 #include "TFile.h"
 
 // Constants
-const bool useFP16 = true;
+const bool useFP16 = false;
 
 
 struct InferDeleter
@@ -59,15 +59,267 @@ class Logger : public nvinfer1::ILogger
     }
 } ghost_logger;
 
+class NetworkInputDescriptor
+{
+    public:
+
+        virtual ~NetworkInputDescriptor();
+
+        // Branch names + _i or _f for integer/float branches
+        virtual std::vector<std::string> get_branch_names() const=0;
+
+        // Size of the host(+device) input buffers needed for the NN
+        virtual unsigned host_buffer_size() const=0;
+
+        // Do the magic mapping the root file variables to the NN input
+        virtual void fill_host_buffer(const float* root_buffer, float* host_buffer) const=0;
+};
+
+NetworkInputDescriptor::~NetworkInputDescriptor(){}
+
+class GhostNetworkInputDescriptor: public NetworkInputDescriptor
+{
+    public:
+
+        GhostNetworkInputDescriptor();
+
+        ~GhostNetworkInputDescriptor();
+
+        std::vector<std::string> get_branch_names() const;
+
+        unsigned host_buffer_size() const;
+
+        // Do the magic mapping the root file variables to the NN input
+        void fill_host_buffer(const float* root_buffer, float* host_buffer) const;
+};
+
+GhostNetworkInputDescriptor::GhostNetworkInputDescriptor(){}
+
+GhostNetworkInputDescriptor::~GhostNetworkInputDescriptor(){}
+
+std::vector<std::string> GhostNetworkInputDescriptor::get_branch_names() const
+{
+    return std::vector<std::string>({"x_f", "y_f", "tx_f", "ty_f", "best_qop_f", "best_pt_f", "kalman_ip_chi2_f", "kalman_docaz_f", "chi2_f", "chi2V_f",
+                                    "chi2UT_f", "chi2T_f", "ndof_i", "ndofV_i", "ndofT_i", "nUT_i"});
+}
+
+unsigned GhostNetworkInputDescriptor::host_buffer_size() const
+{
+    return 17 * sizeof(float);
+}
+
+void GhostNetworkInputDescriptor::fill_host_buffer(const float* root_buffer, float* host_buffer) const
+{
+    host_buffer[0] = 1./ std::abs(root_buffer[4]);
+    std::memcpy((void*)(host_buffer + 1), (const void*)root_buffer, 12 * sizeof(float));
+
+    host_buffer[13] = (float)(*(int32_t*)(root_buffer + 12));
+    host_buffer[14] = (float)(*(int32_t*)(root_buffer + 13));
+    host_buffer[15] = (float)(*(int32_t*)(root_buffer + 14));
+    host_buffer[16] = (float)(*(int32_t*)(root_buffer + 15));
+
+}
+
+class InputDataProvider
+{
+    public:
+
+        InputDataProvider(const NetworkInputDescriptor* network);
+
+        virtual ~InputDataProvider();
+
+        virtual bool load(const std::string& rootFile, const std::string& treeName)=0;
+
+        virtual bool read_event(const int32_t event)=0;
+
+        virtual bool fill_device_buffer(void* buffer)=0;
+
+    protected:
+
+        bool open(  const std::string& rootFile, const std::string treeName, const std::vector<std::string>& branchNames,
+                    float* inputBuffer, float* outputBuffer);
+
+        bool close();
+
+        const NetworkInputDescriptor* mNetworkDescriptor;
+        TFile* mRootFile;
+        TTree* mEventTree;
+    
+};
+
+InputDataProvider::InputDataProvider(const NetworkInputDescriptor* network): mNetworkDescriptor(network), mRootFile(nullptr), mEventTree(nullptr){}
+
+InputDataProvider::~InputDataProvider()
+{
+    close();
+}
+
+bool InputDataProvider::open(const std::string& rootFile, const std::string treeName, const std::vector<std::string>& branchNames, 
+                        float* inputBuffer, float* outputBuffer)
+{
+    close();
+    mRootFile = new TFile(rootFile.c_str());
+    mEventTree = (TTree*)mRootFile->Get(treeName.c_str());
+    for(int32_t i = 0; i < branchNames.size(); ++i)
+    {
+        auto typechar = branchNames[i].back();
+        auto branchName = branchNames[i].substr(0, branchNames[i].size()-2);
+        if(typechar == 'i')
+        {
+            mEventTree->SetBranchAddress(branchName.c_str(), (int32_t*)(&inputBuffer[i]));
+        }
+        else if(typechar == 'f')
+        {
+            mEventTree->SetBranchAddress(branchName.c_str(), &inputBuffer[i]);
+        }
+        else
+        {
+            throw 1;
+        }
+    }
+
+    mEventTree->SetBranchAddress("ghost", (unsigned*)outputBuffer);
+}
+
+bool InputDataProvider::close()
+{
+    if(mEventTree != nullptr)
+    {
+        delete mEventTree;
+    }
+    if(mRootFile != nullptr)
+    {
+        mRootFile->Close();
+        delete mRootFile;
+    }
+}
+
+class FileInputDataProvider: public InputDataProvider
+{
+    public:
+
+        FileInputDataProvider(const NetworkInputDescriptor* network);
+
+        ~FileInputDataProvider();
+
+        bool load(const std::string& rootFile, const std::string& treeName);
+
+        bool read_event(const int32_t event);
+
+        bool fill_device_buffer(void* buffer);
+
+    private:
+
+        void* mInputBuffer;
+        void* mOutputBuffer;
+        void* mTransferBuffer;
+};
+
+FileInputDataProvider::FileInputDataProvider(const NetworkInputDescriptor* network):InputDataProvider(network),
+    mInputBuffer(nullptr), mOutputBuffer(nullptr){}
+
+FileInputDataProvider::~FileInputDataProvider()
+{
+    if(mInputBuffer != nullptr)
+    {
+        cudaFreeHost(mInputBuffer);
+    }
+    if(mOutputBuffer != nullptr)
+    {
+        cudaFreeHost(mOutputBuffer);
+    }
+    if(mTransferBuffer != nullptr)
+    {
+        cudaFreeHost(mTransferBuffer);
+    }
+}
+
+
+bool FileInputDataProvider::load(const std::string& rootFile, const std::string& treeName)
+{
+    auto branchNames = this->mNetworkDescriptor->get_branch_names();
+    auto inputSize = branchNames.size() * sizeof(float);
+    if(mInputBuffer != nullptr)
+    {
+        cudaFreeHost(mInputBuffer);
+    }
+    cudaHostAlloc(&mInputBuffer, inputSize, cudaHostAllocDefault);
+    if(mOutputBuffer != nullptr)
+    {
+        cudaFreeHost(mOutputBuffer);
+    }
+    cudaHostAlloc(&mInputBuffer, sizeof(float), cudaHostAllocDefault);
+
+    this->open(rootFile, treeName, branchNames, (float*)mInputBuffer, (float*)mOutputBuffer);
+
+    auto transferSize = this->mNetworkDescriptor->host_buffer_size();
+    if(mTransferBuffer != nullptr)
+    {
+        cudaFreeHost(mTransferBuffer);
+    }
+    cudaHostAlloc(&mTransferBuffer, transferSize, cudaHostAllocDefault);
+    return true;
+}
+
+bool FileInputDataProvider::read_event(int32_t event)
+{
+    if(mEventTree == nullptr)
+    {
+        return false;
+    }
+    mEventTree->GetEntry(event);
+    return true;
+}
+
+bool FileInputDataProvider::fill_device_buffer(void* inputBufferDevice)
+{
+    this->mNetworkDescriptor->fill_host_buffer((float*)mInputBuffer, (float*)mTransferBuffer);
+    cudaMemcpy(inputBufferDevice, mTransferBuffer, this->mNetworkDescriptor->host_buffer_size() * sizeof(float), cudaMemcpyHostToDevice);
+    return true;
+}
+
+/*class GPUInputDataProvider: public InputDataProvider
+{
+    public:
+
+        GPUInputDataProvider();
+
+        bool load(const std::string& rootFile, const std::string& treeName, const std::vector<std::string>& branchNames, float* buffer);
+
+        bool read_event(const int32_t event);
+
+        bool fill_device_buffer(void* buffer, int32_t size);
+
+    private:
+
+        float* mInputBuffer;
+        float* mOutputBuffer;
+};
+
+bool GPUInputDataProvider::load(const std::string& rootFile, const std::string& treeName, const std::vector<std::string>& branchNames, float* buffer)
+{
+    FileInputDataProvider fileInput;
+    fileInput.load(rootFile, treeName, branchNames, buffer);
+    for(int32_t i = 0; i < nevts; ++i)
+    {
+        fileInput.read_event(i);
+
+    }
+};*/
+
+
+
+
+
 class GhostDetection
 {
     public:
     
-        GhostDetection(const std::string& engineFilename);
+        GhostDetection(const std::string& engineFilename, InputDataProvider* dataProvider);
 
         bool build();
 
-        bool initialize(const std::string& rootFile);
+        bool initialize(const std::string& rootFile, const std::string& treeName);
 
         bool infer(const int32_t nevent, InferenceResult& result);
 
@@ -75,88 +327,25 @@ class GhostDetection
 
         std::string mEngineFilename;
 
+        InputDataProvider* mDataProvider;
+
         std::unique_ptr<nvinfer1::ICudaEngine, InferDeleter> mEngine;
 
         std::unique_ptr<nvinfer1::IExecutionContext, InferDeleter> mContext;
                 
         const int32_t mInputSize, mOutputSize;
 
-        void* mInputBufferHost;
-        uint32_t*  mInputBufferHostInt;
         void* mInputBufferDevice;
-        void* mOutputBufferHost;
         void* mOutputBufferDevice;
-
-        TFile* mRootFile;
-        TTree* mEventTree;
 };
 
-GhostDetection::GhostDetection(const std::string& engineFilename): mEngineFilename(engineFilename), mEngine(nullptr), 
-mContext(nullptr), mInputSize(17),mOutputSize(1), mInputBufferHost(nullptr), mInputBufferHostInt(nullptr), mInputBufferDevice(nullptr), 
-mOutputBufferHost(nullptr), mOutputBufferDevice(nullptr), mRootFile(nullptr), mEventTree(nullptr){}
+GhostDetection::GhostDetection(const std::string& engineFilename, InputDataProvider* dataProvider): mEngineFilename(engineFilename), 
+mDataProvider(dataProvider), mEngine(nullptr), mContext(nullptr), mInputSize(17), mOutputSize(1), mInputBufferDevice(nullptr), 
+mOutputBufferDevice(nullptr){}
 
-bool GhostDetection::initialize(const std::string& rootFile)
+bool GhostDetection::initialize(const std::string& rootFile, const std::string& treeName)
 {
-    // Allocate host and device buffers
-    auto inputSize = mInputSize * sizeof(float);
-    if(mInputBufferHost != nullptr)
-    {
-        cudaFreeHost(mInputBufferHost);
-    }
-    cudaHostAlloc(&mInputBufferHost, inputSize, cudaHostAllocDefault);
-    mInputBufferHostInt = new uint32_t[4];
-    if(mInputBufferDevice != nullptr)
-    {
-        cudaFree(mInputBufferDevice);
-    }
-    cudaMalloc(&mInputBufferDevice, inputSize);
-
-    if(mOutputBufferHost != nullptr)
-    {
-        cudaFreeHost(mOutputBufferHost);
-    }
-    auto outputSize = mOutputSize * sizeof(float);
-    cudaHostAlloc(&mOutputBufferHost, outputSize, cudaHostAllocDefault);
-    if(mOutputBufferDevice != nullptr)
-    {
-        cudaFree(mOutputBufferDevice);
-    }
-    cudaMalloc(&mOutputBufferDevice, outputSize);
-
-    // Open ROOT File
-    if(mRootFile != nullptr)
-    {
-        mRootFile->Close();
-        delete mRootFile;
-        mRootFile = nullptr;
-        mEventTree = nullptr;
-    }
-
-    // Create ROOT event tree
-    mRootFile = new TFile(rootFile.c_str());
-    // TODO: No hardcoded TTree name please
-    mEventTree = (TTree*)mRootFile->Get("kalman_validator/kalman_ip_tree");
-    auto host_vars = static_cast<float*>(mInputBufferHost);
-    mEventTree->SetBranchAddress("x", &host_vars[1]);
-    mEventTree->SetBranchAddress("y", &host_vars[2]);
-    mEventTree->SetBranchAddress("tx", &host_vars[3]);
-    mEventTree->SetBranchAddress("ty", &host_vars[4]);
-    mEventTree->SetBranchAddress("best_qop", &host_vars[5]);
-    mEventTree->SetBranchAddress("best_pt", &host_vars[6]);
-    mEventTree->SetBranchAddress("kalman_ip_chi2", &host_vars[7]);
-    mEventTree->SetBranchAddress("kalman_docaz", &host_vars[8]);
-    mEventTree->SetBranchAddress("chi2", &host_vars[9]);
-    mEventTree->SetBranchAddress("chi2V", &host_vars[10]);
-    mEventTree->SetBranchAddress("chi2UT", &host_vars[11]);
-    mEventTree->SetBranchAddress("chi2T", &host_vars[12]);
-
-    mEventTree->SetBranchAddress("ndof", &mInputBufferHostInt[0]);
-    mEventTree->SetBranchAddress("ndofV", &mInputBufferHostInt[1]);
-    mEventTree->SetBranchAddress("ndofT", &mInputBufferHostInt[2]);
-    mEventTree->SetBranchAddress("nUT", &mInputBufferHostInt[3]);
-
-    mEventTree->SetBranchAddress("ghost", static_cast<unsigned*>(mOutputBufferHost));
-    
+    mDataProvider->load(rootFile, treeName);
     // Create TensorRT context
     mContext = std::unique_ptr<nvinfer1::IExecutionContext, InferDeleter>(mEngine->createExecutionContext());
     if (!mContext)
@@ -257,24 +446,8 @@ bool GhostDetection::build()
 
 bool GhostDetection::infer(int32_t nevent, InferenceResult& result)
 {
-    // Read next event in ROOT file
-    if(mEventTree == nullptr)
-    {
-        return false;
-    }
-    mEventTree->GetEntry(nevent);
-    
-    auto input_vars = (float*)mInputBufferHost;
-    input_vars[0] = 1./ std::abs(input_vars[5]);
-    input_vars[13] = (float)(mInputBufferHostInt[0]);
-    input_vars[14] = (float)(mInputBufferHostInt[1]);
-    input_vars[15] = (float)(mInputBufferHostInt[2]);
-    input_vars[16] = (float)(mInputBufferHostInt[3]);
-
-
-    // Memcpy from host input buffers to device input buffers
-    cudaMemcpy(mInputBufferDevice, mInputBufferHost, mInputSize * sizeof(float), cudaMemcpyHostToDevice);
-
+    mDataProvider->read_event(nevent);
+    mDataProvider->fill_device_buffer(mInputBufferDevice);
     void* buffers[2];
     buffers[0] = mInputBufferDevice;
     buffers[1] = mOutputBufferDevice;
@@ -286,13 +459,14 @@ bool GhostDetection::infer(int32_t nevent, InferenceResult& result)
         return false;
     }
 
-    unsigned truth = ((unsigned*)mOutputBufferHost)[0];
+//    unsigned truth = ((unsigned*)mOutputBufferHost)[0];
+    unsigned truth = 0;
  
     // Memcpy from host input buffers to device input buffers
-    cudaMemcpy(mOutputBufferHost, mOutputBufferDevice, mOutputSize * sizeof(float), cudaMemcpyDeviceToHost);
+//    cudaMemcpy(mOutputBufferHost, mOutputBufferDevice, mOutputSize * sizeof(float), cudaMemcpyDeviceToHost);
 
-    float pred = ((float*)mOutputBufferHost)[0] < 0.5 ? 0 : 1;
-
+//    float pred = ((float*)mOutputBufferHost)[0] < 0.5 ? 0 : 1;
+    float pred =0;
     if(truth == pred)
     {
         result.true_positives += truth;
@@ -310,9 +484,11 @@ bool GhostDetection::infer(int32_t nevent, InferenceResult& result)
 
 int main(int argc, char* argv[])
 {
-    GhostDetection ghostinfer("../data/ghost_nn.onnx");
+    NetworkInputDescriptor* networkDescriptor = new GhostNetworkInputDescriptor();
+    InputDataProvider* inputDataProvider = new FileInputDataProvider(networkDescriptor);
+    GhostDetection ghostinfer("../data/ghost_nn.onnx", inputDataProvider);
     ghostinfer.build();
-    ghostinfer.initialize("../data/PrCheckerPlots.root");
+    ghostinfer.initialize("../data/PrCheckerPlots.root","kalman_validator/kalman_ip_tree");
 
     InferenceResult result;
 

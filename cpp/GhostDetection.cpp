@@ -310,9 +310,19 @@ bool GhostDetection::infer(int32_t nevent, InferenceResult& result)
 
 int main(int argc, char* argv[])
 {
+    bool retVal = true;
     GhostDetection ghostinfer("../data/ghost_nn.onnx");
-    ghostinfer.build();
-    ghostinfer.initialize("../data/PrCheckerPlots.root");
+    
+    retVal = ghostinfer.build();
+    if ( !retVal )
+    {
+        std::cerr << "Build was not successful." << std::endl;
+    }
+    retVal = ghostinfer.initialize("../data/PrCheckerPlots.root");
+    if ( !retVal )
+    {
+        std::cerr << "Build was not successful." << std::endl;
+    }
 
     InferenceResult result;
 

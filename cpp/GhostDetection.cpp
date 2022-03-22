@@ -321,7 +321,7 @@ int main(int argc, char* argv[])
     retVal = ghostinfer.initialize("../data/PrCheckerPlots.root");
     if ( !retVal )
     {
-        std::cerr << "Build was not successful." << std::endl;
+        std::cerr << "Initialization was not successful." << std::endl;
     }
 
     InferenceResult result;

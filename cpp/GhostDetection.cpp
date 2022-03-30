@@ -540,8 +540,19 @@ int main(int argc, char* argv[])
 //    InputDataProvider* inputDataProvider = new FileInputDataProvider(networkDescriptor);
     InputDataProvider* inputDataProvider = new GPUInputDataProvider(networkDescriptor);
     GhostDetection ghostinfer("../data/ghost_nn.onnx", inputDataProvider);
-    ghostinfer.build();
-    ghostinfer.initialize("../data/PrCheckerPlots.root","kalman_validator/kalman_ip_tree");
+    bool retVal = true;
+    retVal = ghostinfer.build();
+    if ( !retVal )
+    {
+        std::cerr << "Build was not successful." << std::endl;
+        return -1;
+    }
+    retVal = ghostinfer.initialize("../data/PrCheckerPlots.root","kalman_validator/kalman_ip_tree");
+    if ( !retVal )
+    {
+        std::cerr << "Initialization was not successful." << std::endl;
+        return -1;
+    }
 
     InferenceResult result;
 

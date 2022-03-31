@@ -537,6 +537,34 @@ bool GhostDetection::infer(int32_t nevent, InferenceResult& result)
 int main(int argc, char* argv[])
 {
     NetworkInputDescriptor* networkDescriptor = new GhostNetworkInputDescriptor();
+    int offset = 0;
+    InputDataProvider* inputDataProvider = nullptr;
+    std::vector<int> batches = {1};
+    if(argc > 0)
+    {
+        if(argv[0] == "-f")
+        {
+            inputDataProvider = new FileInputDataProvider(networkDescriptor);
+            offset = 1;
+        }
+        else if (argv[0] == "-g")
+        {
+            inputDataProvider = new GPUInputDataProvider(networkDescriptor);
+            offset = 1;
+        }
+        else
+        {
+            offset = 0;
+        }
+        for(auto i = offset; i < argc; ++i)
+        {
+            batches.push_back(std::stoi(argv[i]));
+        }
+    }
+    if(inputDataProvider == nullptr)
+    {
+        inputDataProvider = new GPUInputDataProvider(networkDescriptor);
+    }
 //    InputDataProvider* inputDataProvider = new FileInputDataProvider(networkDescriptor);
     InputDataProvider* inputDataProvider = new GPUInputDataProvider(networkDescriptor);
     GhostDetection ghostinfer("../data/ghost_nn.onnx", inputDataProvider);
@@ -554,16 +582,29 @@ int main(int argc, char* argv[])
         return -1;
     }
 
+    std::sort(batches.begin(), batches.end());
     InferenceResult result;
-
-    auto start = std::chrono::high_resolution_clock::now();
-
-    for(int32_t i = 0; i < 10000; ++i)
+    for(auto it = batches.begin(); it != batches.end(); ++it)
     {
-        ghostinfer.infer(i, result);
-    }
+        std::cout<<"Benchmarking batch size "<<*it<<"..."<<std::endl;
+        InferenceResult batch_result;
 
-    auto stop = std::chrono::high_resolution_clock::now();
+        auto start = std::chrono::high_resolution_clock::now();
+
+        for(int32_t i = 0; i < 10000; ++i)
+        {
+            ghostinfer.infer(i, batch_result);
+        }
+
+        if(it == batches.begin())
+        {
+            result = batch_result;
+        }
+
+        auto stop = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
+        std::cout<<"Duration: "<<duration.count()<<" microsec."<<std::endl;
+    }
 
     std::cout<<".............................................."<<std::endl;
     std::cout<<"No. true positives:  "<<result.true_positives<<std::endl;
@@ -573,8 +614,6 @@ int main(int argc, char* argv[])
     std::cout<<".............................................."<<std::endl;
     std::cout<<"accuracy:" <<result.accuracy()<<std::endl<<std::endl;
 
-    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
-    std::cout<<"Duration: "<<duration.count()<<" microsec."<<std::endl;
 
     delete inputDataProvider;
     delete networkDescriptor;

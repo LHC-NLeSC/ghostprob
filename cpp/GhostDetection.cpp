@@ -84,6 +84,9 @@ class NetworkInputDescriptor
 
         // Do the magic mapping the root file variables to the NN input
         virtual void fill_host_buffer(const void* root_buffer, void* host_buffer) const=0;
+
+        // No events in the file
+        virtual unsigned n_events() const=0;
 };
 
 NetworkInputDescriptor::~NetworkInputDescriptor(){}
@@ -102,8 +105,9 @@ class GhostNetworkInputDescriptor: public NetworkInputDescriptor
 
         unsigned device_buffer_size() const;
 
-        // Do the magic mapping the root file variables to the NN input
         void fill_host_buffer(const void* root_buffer, void* host_buffer) const;
+
+        virtual unsigned n_events() const;
 };
 
 GhostNetworkInputDescriptor::GhostNetworkInputDescriptor(){}
@@ -136,6 +140,11 @@ void GhostNetworkInputDescriptor::fill_host_buffer(const void* root_buffer, void
     ((float*)host_buffer)[14] = (float)(int_buffer[1]);
     ((float*)host_buffer)[15] = (float)(int_buffer[2]);
     ((float*)host_buffer)[16] = (float)(int_buffer[3]);
+}
+
+unsigned GhostNetworkInputDescriptor::n_events() const
+{
+    return 10000;
 }
 
 class InputDataProvider
@@ -367,7 +376,7 @@ GPUInputDataProvider::~GPUInputDataProvider()
 
 bool GPUInputDataProvider::load(const std::string& rootFile, const std::string& treeName, const int32_t batchSize)
 {
-    auto nevts = 10000;
+    auto nevts = this->mNetworkDescriptor->n_events();
     stride = this->mNetworkDescriptor->device_buffer_size();
     FileInputDataProvider fileInput(this->mNetworkDescriptor);
     cudaMalloc(&mInputBuffer, nevts * stride);
@@ -636,7 +645,7 @@ int main(int argc, char* argv[])
         }
 
         auto start = std::chrono::high_resolution_clock::now();
-        for(int32_t i = 0; i < 10000; i+=(*it))
+        for(int32_t i = 0; i < inputDataProvider->network_input()->n_events(); i+=(*it))
         {
             ghostinfer.infer(i, *it, result);
         }

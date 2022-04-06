@@ -67,11 +67,11 @@ class Logger : public nvinfer1::ILogger
     }
 } ghost_logger;
 
-class NetworkInputDescriptor
+class VariableSet
 {
     public:
 
-        virtual ~NetworkInputDescriptor();
+        virtual ~VariableSet();
 
         // Branch names + _i or _f for integer/float branches
         virtual std::vector<std::string> get_branch_names() const=0;
@@ -89,15 +89,15 @@ class NetworkInputDescriptor
         virtual unsigned n_events() const=0;
 };
 
-NetworkInputDescriptor::~NetworkInputDescriptor(){}
+VariableSet::~VariableSet(){}
 
-class GhostNetworkInputDescriptor: public NetworkInputDescriptor
+class GhostVariableSet: public VariableSet
 {
     public:
 
-        GhostNetworkInputDescriptor();
+        GhostVariableSet();
 
-        ~GhostNetworkInputDescriptor();
+        ~GhostVariableSet();
 
         std::vector<std::string> get_branch_names() const;
 
@@ -110,28 +110,28 @@ class GhostNetworkInputDescriptor: public NetworkInputDescriptor
         virtual unsigned n_events() const;
 };
 
-GhostNetworkInputDescriptor::GhostNetworkInputDescriptor(){}
+GhostVariableSet::GhostVariableSet(){}
 
-GhostNetworkInputDescriptor::~GhostNetworkInputDescriptor(){}
+GhostVariableSet::~GhostVariableSet(){}
 
-std::vector<std::string> GhostNetworkInputDescriptor::get_branch_names() const
+std::vector<std::string> GhostVariableSet::get_branch_names() const
 {
     return std::vector<std::string>({"x_f", "y_f", "tx_f", "ty_f", "best_qop_f", "best_pt_f", "kalman_ip_chi2_f", 
                                         "kalman_docaz_f", "chi2_f", "chi2V_f", "chi2UT_f", "chi2T_f", 
                                         "ndof_i", "ndofV_i", "ndofT_i", "nUT_i"});
 }
 
-unsigned GhostNetworkInputDescriptor::host_buffer_size() const
+unsigned GhostVariableSet::host_buffer_size() const
 {
     return 12 * sizeof(float) + 4 * sizeof(int32_t);
 }
 
-unsigned GhostNetworkInputDescriptor::device_buffer_size() const
+unsigned GhostVariableSet::device_buffer_size() const
 {
     return 17 * sizeof(float);
 }
 
-void GhostNetworkInputDescriptor::fill_host_buffer(const void* root_buffer, void* host_buffer) const
+void GhostVariableSet::fill_host_buffer(const void* root_buffer, void* host_buffer) const
 {
     ((float*)host_buffer)[0] = 1./ std::abs(((const float*) root_buffer)[4]);
     std::memcpy(host_buffer + sizeof(float), root_buffer, 12 * sizeof(float));
@@ -142,7 +142,7 @@ void GhostNetworkInputDescriptor::fill_host_buffer(const void* root_buffer, void
     ((float*)host_buffer)[16] = (float)(int_buffer[3]);
 }
 
-unsigned GhostNetworkInputDescriptor::n_events() const
+unsigned GhostVariableSet::n_events() const
 {
     return 10000;
 }
@@ -151,11 +151,11 @@ class InputDataProvider
 {
     public:
 
-        InputDataProvider(const NetworkInputDescriptor* network);
+        InputDataProvider(const VariableSet* variableSet);
 
         virtual ~InputDataProvider();
 
-        const NetworkInputDescriptor* network_input() const;
+        const VariableSet* input_variables() const;
 
         virtual bool load(const std::string& rootFile, const std::string& treeName, const int32_t batchSize)=0;
 
@@ -170,22 +170,22 @@ class InputDataProvider
 
         bool close();
 
-        const NetworkInputDescriptor* mNetworkDescriptor;
+        const VariableSet* mVariableSet;
         TFile* mRootFile;
         TTree* mEventTree;
     
 };
 
-InputDataProvider::InputDataProvider(const NetworkInputDescriptor* network): mNetworkDescriptor(network), mRootFile(nullptr), mEventTree(nullptr){}
+InputDataProvider::InputDataProvider(const VariableSet* network): mVariableSet(network), mRootFile(nullptr), mEventTree(nullptr){}
 
 InputDataProvider::~InputDataProvider()
 {
     close();
 }
 
-const NetworkInputDescriptor* InputDataProvider::network_input() const
+const VariableSet* InputDataProvider::input_variables() const
 {
-    return mNetworkDescriptor;
+    return mVariableSet;
 }
 
 bool InputDataProvider::open(const std::string& rootFile, const std::string treeName, const std::vector<std::string>& branchNames, 
@@ -235,7 +235,7 @@ class FileInputDataProvider: public InputDataProvider
 {
     public:
 
-        FileInputDataProvider(const NetworkInputDescriptor* network);
+        FileInputDataProvider(const VariableSet* network);
 
         ~FileInputDataProvider();
 
@@ -253,7 +253,7 @@ class FileInputDataProvider: public InputDataProvider
         void* mOutputTransferBuffer;
 };
 
-FileInputDataProvider::FileInputDataProvider(const NetworkInputDescriptor* network):InputDataProvider(network),
+FileInputDataProvider::FileInputDataProvider(const VariableSet* variableSet):InputDataProvider(variableSet),
     mInputBuffer(nullptr), mOutputBuffer(nullptr), mInputTransferBuffer(nullptr), mOutputTransferBuffer(nullptr){}
 
 FileInputDataProvider::~FileInputDataProvider()
@@ -279,19 +279,19 @@ FileInputDataProvider::~FileInputDataProvider()
 
 bool FileInputDataProvider::load(const std::string& rootFile, const std::string& treeName, const int32_t batchSize)
 {
-    auto branchNames = this->mNetworkDescriptor->get_branch_names();
+    auto branchNames = this->mVariableSet->get_branch_names();
 
     if(mInputBuffer != nullptr)
     {
         cudaFreeHost(mInputBuffer);
     }
-    cudaHostAlloc(&mInputBuffer, this->mNetworkDescriptor->host_buffer_size(), cudaHostAllocDefault);
+    cudaHostAlloc(&mInputBuffer, this->mVariableSet->host_buffer_size(), cudaHostAllocDefault);
 
     if(mInputTransferBuffer != nullptr)
     {
         cudaFreeHost(mInputTransferBuffer);
     }
-    cudaHostAlloc(&mInputTransferBuffer, this->mNetworkDescriptor->device_buffer_size() * batchSize, cudaHostAllocDefault);
+    cudaHostAlloc(&mInputTransferBuffer, this->mVariableSet->device_buffer_size() * batchSize, cudaHostAllocDefault);
 
     if(mOutputBuffer != nullptr)
     {
@@ -316,11 +316,11 @@ int32_t* FileInputDataProvider::read_events(int32_t event, const int32_t batchSi
     {
         return nullptr;
     }
-    int32_t stride = this->mNetworkDescriptor->device_buffer_size();
+    int32_t stride = this->mVariableSet->device_buffer_size();
     for(int32_t i = 0; i < batchSize ; ++i)
     {
         mEventTree->GetEntry(event + i);
-        this->mNetworkDescriptor->fill_host_buffer(mInputBuffer, mInputTransferBuffer + stride * i);
+        this->mVariableSet->fill_host_buffer(mInputBuffer, mInputTransferBuffer + stride * i);
         ((int32_t*)mOutputTransferBuffer)[i] = ((unsigned*)mOutputBuffer)[0];
     }
     return (int32_t*)mOutputTransferBuffer;
@@ -329,7 +329,7 @@ int32_t* FileInputDataProvider::read_events(int32_t event, const int32_t batchSi
 bool FileInputDataProvider::fill_device_buffer(void* inputBufferDevice, const int32_t batchSize)
 {
     cudaMemcpy(inputBufferDevice, mInputTransferBuffer, 
-        this->mNetworkDescriptor->device_buffer_size() * batchSize, cudaMemcpyHostToDevice);
+        this->mVariableSet->device_buffer_size() * batchSize, cudaMemcpyHostToDevice);
     return true;
 }
 
@@ -337,7 +337,7 @@ class GPUInputDataProvider: public InputDataProvider
 {
     public:
 
-        GPUInputDataProvider(const NetworkInputDescriptor* network);
+        GPUInputDataProvider(const VariableSet* variableSet);
 
         ~GPUInputDataProvider();
 
@@ -356,7 +356,7 @@ class GPUInputDataProvider: public InputDataProvider
         int32_t stride;
 };
 
-GPUInputDataProvider::GPUInputDataProvider(const NetworkInputDescriptor* network): InputDataProvider(network), 
+GPUInputDataProvider::GPUInputDataProvider(const VariableSet* variableSet): InputDataProvider(variableSet), 
 mInputBuffer(nullptr), mOutputBuffer(nullptr), index(-1){}
 
 GPUInputDataProvider::~GPUInputDataProvider()
@@ -376,9 +376,9 @@ GPUInputDataProvider::~GPUInputDataProvider()
 
 bool GPUInputDataProvider::load(const std::string& rootFile, const std::string& treeName, const int32_t batchSize)
 {
-    auto nevts = this->mNetworkDescriptor->n_events();
-    stride = this->mNetworkDescriptor->device_buffer_size();
-    FileInputDataProvider fileInput(this->mNetworkDescriptor);
+    auto nevts = this->mVariableSet->n_events();
+    stride = this->mVariableSet->device_buffer_size();
+    FileInputDataProvider fileInput(this->mVariableSet);
     cudaMalloc(&mInputBuffer, nevts * stride);
     fileInput.load(rootFile, treeName, 1);
     for(int32_t i = 0; i < nevts; ++i)
@@ -445,7 +445,7 @@ bool GhostDetection::initialize(const std::string& rootFile, const std::string& 
         cudaFree(mInputBufferDevice);
         mInputBufferDevice = nullptr;
     }
-    cudaMalloc(&mInputBufferDevice, mDataProvider->network_input()->host_buffer_size() * batchSize);
+    cudaMalloc(&mInputBufferDevice, mDataProvider->input_variables()->host_buffer_size() * batchSize);
 
     if(mOutputBufferDevice != nullptr)
     {
@@ -595,7 +595,7 @@ bool GhostDetection::infer(int32_t nevent, int32_t batchSize, InferenceResult& r
 
 int main(int argc, char* argv[])
 {
-    NetworkInputDescriptor* networkDescriptor = new GhostNetworkInputDescriptor();
+    VariableSet* inputVariables = new GhostVariableSet();
     int offset = 1;
     InputDataProvider* inputDataProvider = nullptr;
     std::vector<int> batches = {1};
@@ -603,12 +603,12 @@ int main(int argc, char* argv[])
     {
         if(std::string(argv[1]) == "-f")
         {
-            inputDataProvider = new FileInputDataProvider(networkDescriptor);
+            inputDataProvider = new FileInputDataProvider(inputVariables);
             offset = 2;
         }
         if (std::string(argv[1]) == "-g")
         {
-            inputDataProvider = new GPUInputDataProvider(networkDescriptor);
+            inputDataProvider = new GPUInputDataProvider(inputVariables);
             offset = 2;
         }
         for(auto i = offset; i < argc; ++i)
@@ -618,7 +618,7 @@ int main(int argc, char* argv[])
     }
     if(inputDataProvider == nullptr)
     {
-        inputDataProvider = new GPUInputDataProvider(networkDescriptor);
+        inputDataProvider = new GPUInputDataProvider(inputVariables);
     }
     GhostDetection ghostinfer("../data/ghost_nn.onnx", inputDataProvider);
     bool retVal = true;
@@ -645,7 +645,7 @@ int main(int argc, char* argv[])
         }
 
         auto start = std::chrono::high_resolution_clock::now();
-        for(int32_t i = 0; i < inputDataProvider->network_input()->n_events(); i+=(*it))
+        for(int32_t i = 0; i < inputDataProvider->input_variables()->n_events(); i+=(*it))
         {
             ghostinfer.infer(i, *it, result);
         }
@@ -667,5 +667,5 @@ int main(int argc, char* argv[])
     }
 
     delete inputDataProvider;
-    delete networkDescriptor;
+    delete inputVariables;
 }

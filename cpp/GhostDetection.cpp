@@ -424,21 +424,16 @@ class GhostDetection
         std::unique_ptr<nvinfer1::ICudaEngine, InferDeleter> mEngine;
 
         std::unique_ptr<nvinfer1::IExecutionContext, InferDeleter> mContext;
-                
-        const int32_t mInputSize, mOutputSize;
 
-        int32_t mBatchSize;
         void* mInputBufferDevice;
         void* mOutputBufferDevice;
 };
 
 GhostDetection::GhostDetection(const std::string& engineFilename, InputDataProvider* dataProvider): mEngineFilename(engineFilename), 
-mDataProvider(dataProvider), mEngine(nullptr), mContext(nullptr), mInputSize(17), mOutputSize(1), mBatchSize(1), mInputBufferDevice(nullptr), 
-mOutputBufferDevice(nullptr){}
+mDataProvider(dataProvider), mEngine(nullptr), mContext(nullptr), mInputBufferDevice(nullptr), mOutputBufferDevice(nullptr){}
 
 bool GhostDetection::initialize(const std::string& rootFile, const std::string& treeName, int32_t batchSize)
 {
-    mBatchSize = batchSize;
     mDataProvider->load(rootFile, treeName, batchSize);
     if(mInputBufferDevice != nullptr)
     {
@@ -454,7 +449,8 @@ bool GhostDetection::initialize(const std::string& rootFile, const std::string& 
     }
     cudaMalloc(&mOutputBufferDevice, sizeof(float) * batchSize);
     mContext->setOptimizationProfile(0);
-    mContext->setBindingDimensions(0, nvinfer1::Dims2(batchSize, mInputSize));
+    auto inputSize = mDataProvider->input_variables()->device_buffer_size() / sizeof(float);
+    mContext->setBindingDimensions(0, nvinfer1::Dims2(batchSize, inputSize));
     return true;
 }
 
@@ -495,9 +491,10 @@ bool GhostDetection::build(const int32_t maxBatchSize)
     }
 
     nvinfer1::IOptimizationProfile* profile = builder->createOptimizationProfile();
-    profile->setDimensions("dense_input", nvinfer1::OptProfileSelector::kMIN, nvinfer1::Dims2(1, mInputSize));
-    profile->setDimensions("dense_input", nvinfer1::OptProfileSelector::kOPT, nvinfer1::Dims2(maxBatchSize/4, mInputSize));
-    profile->setDimensions("dense_input", nvinfer1::OptProfileSelector::kMAX, nvinfer1::Dims2(maxBatchSize, mInputSize));
+    auto inputSize = mDataProvider->input_variables()->device_buffer_size() / sizeof(float);
+    profile->setDimensions("dense_input", nvinfer1::OptProfileSelector::kMIN, nvinfer1::Dims2(1, inputSize));
+    profile->setDimensions("dense_input", nvinfer1::OptProfileSelector::kOPT, nvinfer1::Dims2(maxBatchSize/4, inputSize));
+    profile->setDimensions("dense_input", nvinfer1::OptProfileSelector::kMAX, nvinfer1::Dims2(maxBatchSize, inputSize));
 
     config->addOptimizationProfile(profile);
 
@@ -507,7 +504,8 @@ bool GhostDetection::build(const int32_t maxBatchSize)
     {
         profileStream.reset(nullptr);
     }
-    config->setProfileStream(*profileStream);*/
+    config->setProfileStream(*profileStream);
+*/
 
     // Define the ONNX parser with the network it should write to
     auto parser = std::unique_ptr<nvonnxparser::IParser, InferDeleter>(nvonnxparser::createParser(*network, ghost_logger));

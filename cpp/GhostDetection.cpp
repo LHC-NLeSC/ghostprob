@@ -416,7 +416,9 @@ class GhostDetection
 
         bool initialize(const std::string& rootFile, const std::string& treeName, int32_t batchSize);
 
-        bool infer(const int32_t nevent, const int32_t batchSize);
+        bool infer_batch(const int32_t nevent, const int32_t batchSize);
+
+        InferenceResult infer_sample(const int32_t batchSize);
 
         InferenceResult collect_results() const;
 
@@ -433,7 +435,6 @@ class GhostDetection
         void* mInputBufferDevice;
         void* mOutputBufferDevice;
         void* mTruthBufferHost;
-
 };
 
 GhostDetection::GhostDetection(const std::string& engineFilename, InputDataProvider* dataProvider): mEngineFilename(engineFilename), 
@@ -602,7 +603,7 @@ InferenceResult GhostDetection::collect_results() const
 }
 
 
-bool GhostDetection::infer(int32_t nevent, int32_t batchSize)
+bool GhostDetection::infer_batch(const int32_t nevent, const int32_t batchSize)
 {
     auto clipBatch = std::min((int32_t)(this->mDataProvider->input_variables()->n_events()) - nevent - 1, batchSize);
 
@@ -617,6 +618,15 @@ bool GhostDetection::infer(int32_t nevent, int32_t batchSize)
     return mContext->executeV2((void* const*)buffers);
 }
 
+InferenceResult GhostDetection::infer_sample(const int32_t batchSize)
+{
+    for(int32_t i = 0; i < mDataProvider->input_variables()->n_events(); i += batchSize)
+    {
+        infer_batch(i, batchSize);
+    }
+    return collect_results();
+}
+
 
 int main(int argc, char* argv[])
 {
@@ -626,6 +636,18 @@ int main(int argc, char* argv[])
     std::vector<int> batches = {1};
     if(argc > 0)
     {
+        if(std::string(argv[1]) == "-h" or std::string(argv[1]) == "--help")
+        {
+            std::cout<<"Usage: ./main -<f|g> <N1> <N2> <N3> ..."<<std::endl;
+            std::cout<<"Options:"<<std::endl;
+            std::cout<<"\t-f: read from ROOT file per batch and transfer to GPU"<<std::endl;
+            std::cout<<"\t-g: read full ROOT file and transfer all data to GPU first (default)"<<std::endl;
+            std::cout<<"\tN1 (int): first batch size to benchmark"<<std::endl;
+            std::cout<<"\tN2 (int): second batch size to benchmark"<<std::endl;
+            std::cout<<"\tN3 (int): third batch size to benchmark"<<std::endl;
+            std::cout<<"\t..."<<std::endl;
+            std::exit(0);
+        }
         if(std::string(argv[1]) == "-f")
         {
             inputDataProvider = new FileInputDataProvider(inputVariables);
@@ -669,24 +691,20 @@ int main(int argc, char* argv[])
         auto start = std::chrono::high_resolution_clock::now();
         for(int32_t i = 0; i < inputDataProvider->input_variables()->n_events(); i+=(*it))
         {
-            ghostinfer.infer(i, *it);
+            ghostinfer.infer_batch(i, *it);
         }
         auto stop = std::chrono::high_resolution_clock::now();
 
         auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
         auto result = ghostinfer.collect_results();
-//        if(it == batches.begin())
-//        {
-            std::cout<<".............................................."<<std::endl;
-            std::cout<<"No. true positives:  "<<result.true_positives<<std::endl;
-            std::cout<<"No. true negatives:  "<<result.true_negatives<<std::endl;
-            std::cout<<"No. false positives: "<<result.false_positives<<std::endl;
-            std::cout<<"No. false negatives: "<<result.false_negatives<<std::endl;
-            std::cout<<".............................................."<<std::endl;
-            std::cout<<"accuracy:" <<result.accuracy()<<std::endl<<std::endl<<std::endl;
-//        }
-        std::cout<<"Duration: "<<duration.count()<<" microsec."<<std::endl;
-
+        std::cout<<".............................................."<<std::endl;
+        std::cout<<"No. true positives:  "<<result.true_positives<<std::endl;
+        std::cout<<"No. true negatives:  "<<result.true_negatives<<std::endl;
+        std::cout<<"No. false positives: "<<result.false_positives<<std::endl;
+        std::cout<<"No. false negatives: "<<result.false_negatives<<std::endl;
+        std::cout<<".............................................."<<std::endl;
+        std::cout<<"accuracy:" <<result.accuracy()<<std::endl;
+        std::cout<<"Duration: "<<duration.count()<<" microseconds"<<std::endl<<std::endl<<std::endl;
     }
 
     delete inputDataProvider;

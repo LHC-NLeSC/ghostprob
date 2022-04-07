@@ -5,6 +5,7 @@
 #include <memory>
 #include <sstream>
 #include <chrono>
+#include <utility>
 
 #include <cuda_runtime_api.h>
 #include "NvInfer.h"
@@ -159,7 +160,7 @@ class InputDataProvider
 
         virtual bool load(const std::string& rootFile, const std::string& treeName, const int32_t batchSize)=0;
 
-        virtual int32_t* read_events(const int32_t event, const int32_t batchSize)=0;
+        virtual bool read_events(const int32_t event, const int32_t batchSize, void* truth_buffer)=0;
 
         virtual bool fill_device_buffer(void* buffer, const int32_t batchSize)=0;
 
@@ -241,7 +242,7 @@ class FileInputDataProvider: public InputDataProvider
 
         bool load(const std::string& rootFile, const std::string& treeName, const int32_t batchSize);
 
-        int32_t* read_events(const int32_t event, const int32_t batchSize);
+        bool read_events(const int32_t event, const int32_t batchSize, void* truth_buffer);
 
         bool fill_device_buffer(void* buffer, const int32_t batchSize);
 
@@ -250,11 +251,10 @@ class FileInputDataProvider: public InputDataProvider
         void* mInputBuffer;
         void* mOutputBuffer;
         void* mInputTransferBuffer;
-        void* mOutputTransferBuffer;
 };
 
 FileInputDataProvider::FileInputDataProvider(const VariableSet* variableSet):InputDataProvider(variableSet),
-    mInputBuffer(nullptr), mOutputBuffer(nullptr), mInputTransferBuffer(nullptr), mOutputTransferBuffer(nullptr){}
+    mInputBuffer(nullptr), mOutputBuffer(nullptr), mInputTransferBuffer(nullptr){}
 
 FileInputDataProvider::~FileInputDataProvider()
 {
@@ -270,67 +270,58 @@ FileInputDataProvider::~FileInputDataProvider()
     {
         cudaFreeHost(mInputTransferBuffer);
     }
-    if(mOutputTransferBuffer != nullptr)
-    {
-        cudaFreeHost(mOutputTransferBuffer);
-    }
 }
 
 
 bool FileInputDataProvider::load(const std::string& rootFile, const std::string& treeName, const int32_t batchSize)
 {
-    auto branchNames = this->mVariableSet->get_branch_names();
+    auto branchNames = mVariableSet->get_branch_names();
 
     if(mInputBuffer != nullptr)
     {
         cudaFreeHost(mInputBuffer);
+        mInputBuffer = nullptr;
     }
-    cudaHostAlloc(&mInputBuffer, this->mVariableSet->host_buffer_size(), cudaHostAllocDefault);
+    cudaHostAlloc(&mInputBuffer, mVariableSet->host_buffer_size(), cudaHostAllocDefault);
 
     if(mInputTransferBuffer != nullptr)
     {
         cudaFreeHost(mInputTransferBuffer);
+        mInputTransferBuffer = nullptr;
     }
-    cudaHostAlloc(&mInputTransferBuffer, this->mVariableSet->device_buffer_size() * batchSize, cudaHostAllocDefault);
+    cudaHostAlloc(&mInputTransferBuffer, mVariableSet->device_buffer_size() * batchSize, cudaHostAllocDefault);
 
     if(mOutputBuffer != nullptr)
     {
         cudaFreeHost(mOutputBuffer);
+        mOutputBuffer = nullptr;
     }
     cudaHostAlloc(&mOutputBuffer, sizeof(int32_t), cudaHostAllocDefault);
-
-    if(mOutputTransferBuffer != nullptr)
-    {
-        cudaFreeHost(mOutputTransferBuffer);
-    }
-    cudaHostAlloc(&mOutputTransferBuffer, sizeof(int32_t) * batchSize, cudaHostAllocDefault);
 
     this->open(rootFile, treeName, branchNames, (void*)mInputBuffer, (void*)mOutputBuffer);
 
     return true;
 }
 
-int32_t* FileInputDataProvider::read_events(int32_t event, const int32_t batchSize)
+bool FileInputDataProvider::read_events(int32_t event, const int32_t batchSize, void* truth_buffer)
 {
     if(mEventTree == nullptr)
     {
-        return nullptr;
+        return false;
     }
-    int32_t stride = this->mVariableSet->device_buffer_size();
+    int32_t stride = mVariableSet->device_buffer_size();
     for(int32_t i = 0; i < batchSize ; ++i)
     {
         mEventTree->GetEntry(event + i);
-        this->mVariableSet->fill_host_buffer(mInputBuffer, mInputTransferBuffer + stride * i);
-        ((int32_t*)mOutputTransferBuffer)[i] = ((unsigned*)mOutputBuffer)[0];
+        mVariableSet->fill_host_buffer(mInputBuffer, mInputTransferBuffer + stride * i);
+        ((int32_t*)truth_buffer)[i] = ((unsigned*)mOutputBuffer)[0];
     }
-    return (int32_t*)mOutputTransferBuffer;
+    return true;
 }
 
 bool FileInputDataProvider::fill_device_buffer(void* inputBufferDevice, const int32_t batchSize)
 {
-    cudaMemcpy(inputBufferDevice, mInputTransferBuffer, 
-        this->mVariableSet->device_buffer_size() * batchSize, cudaMemcpyHostToDevice);
-    return true;
+    return cudaMemcpy(inputBufferDevice, mInputTransferBuffer, mVariableSet->device_buffer_size() * batchSize, cudaMemcpyHostToDevice);
 }
 
 class GPUInputDataProvider: public InputDataProvider
@@ -343,21 +334,19 @@ class GPUInputDataProvider: public InputDataProvider
 
         bool load(const std::string& rootFile, const std::string& treeName, const int32_t batchSize);
 
-        int32_t* read_events(const int32_t event, const int32_t batchSize);
+        bool read_events(const int32_t event, const int32_t batchSize, void* truth_buffer);
 
         bool fill_device_buffer(void* buffer, const int32_t batchSize);
 
     private:
 
         void* mInputBuffer;
-        void* mOutputBuffer;
-        std::vector<int32_t> truths;
+        void* mTruths;
         int32_t index;
-        int32_t stride;
 };
 
 GPUInputDataProvider::GPUInputDataProvider(const VariableSet* variableSet): InputDataProvider(variableSet), 
-mInputBuffer(nullptr), mOutputBuffer(nullptr), index(-1){}
+mInputBuffer(nullptr), mTruths(nullptr), index(-1){}
 
 GPUInputDataProvider::~GPUInputDataProvider()
 {
@@ -366,39 +355,53 @@ GPUInputDataProvider::~GPUInputDataProvider()
         cudaFree(mInputBuffer);
         mInputBuffer = nullptr;
     }
-    if(mOutputBuffer != nullptr)
+    if(mTruths != nullptr)
     {
-        cudaFree(mOutputBuffer);
-        mOutputBuffer = nullptr;
+        cudaFreeHost(mTruths);
+        mTruths = nullptr;
     }
-    truths.clear();
 }
 
 bool GPUInputDataProvider::load(const std::string& rootFile, const std::string& treeName, const int32_t batchSize)
 {
-    auto nevts = this->mVariableSet->n_events();
-    stride = this->mVariableSet->device_buffer_size();
-    FileInputDataProvider fileInput(this->mVariableSet);
-    cudaMalloc(&mInputBuffer, nevts * stride);
-    fileInput.load(rootFile, treeName, 1);
-    for(int32_t i = 0; i < nevts; ++i)
+    auto sampleSize = this->mVariableSet->n_events();
+    auto eventSize = this->mVariableSet->device_buffer_size();
+
+    if(mInputBuffer != nullptr)
     {
-        auto result = fileInput.read_events(i, 1);
-        truths.push_back(result[0]);
-        fileInput.fill_device_buffer(mInputBuffer + i * stride, 1);
+        cudaFree(mInputBuffer);
+        mInputBuffer = nullptr;
+    }
+    cudaMalloc(&mInputBuffer, sampleSize * eventSize);
+
+    if(mTruths != nullptr)
+    {
+        cudaFreeHost(mTruths);
+        mTruths = nullptr;
+    }
+    cudaHostAlloc(&mTruths, sampleSize * sizeof(int32_t),  cudaHostAllocDefault);
+
+    FileInputDataProvider fileInput(this->mVariableSet);
+    fileInput.load(rootFile, treeName, 1);
+    for(int32_t i = 0; i < sampleSize; ++i)
+    {
+        auto result = fileInput.read_events(i, 1, mTruths + i * sizeof(int32_t));
+        fileInput.fill_device_buffer(mInputBuffer + i * eventSize, 1);
     }
     return true;
 }
 
-int32_t* GPUInputDataProvider::read_events(int32_t event, const int32_t batchSize)
+bool GPUInputDataProvider::read_events(int32_t event, const int32_t batchSize, void* truth_buffer)
 {
     index = event;
-    return truths.data() + index;
+    return cudaMemcpy(truth_buffer, mTruths + index * sizeof(int32_t), batchSize * sizeof(int32_t), cudaMemcpyHostToHost);
 }
 
 bool GPUInputDataProvider::fill_device_buffer(void* buffer, const int32_t batchSize)
 {
-    cudaMemcpy(buffer, mInputBuffer + index * stride * batchSize, stride * batchSize, cudaMemcpyDeviceToDevice);
+    auto eventSize = this->mVariableSet->device_buffer_size();
+    cudaMemcpy(buffer, mInputBuffer + index * eventSize, eventSize * batchSize, cudaMemcpyDeviceToDevice);
+    return true;
 }
 
 
@@ -413,7 +416,9 @@ class GhostDetection
 
         bool initialize(const std::string& rootFile, const std::string& treeName, int32_t batchSize);
 
-        bool infer(const int32_t nevent, const int32_t batchSize, InferenceResult& result);
+        bool infer(const int32_t nevent, const int32_t batchSize);
+
+        InferenceResult collect_results() const;
 
     private:
 
@@ -427,27 +432,40 @@ class GhostDetection
 
         void* mInputBufferDevice;
         void* mOutputBufferDevice;
+        void* mTruthBufferHost;
+
 };
 
 GhostDetection::GhostDetection(const std::string& engineFilename, InputDataProvider* dataProvider): mEngineFilename(engineFilename), 
-mDataProvider(dataProvider), mEngine(nullptr), mContext(nullptr), mInputBufferDevice(nullptr), mOutputBufferDevice(nullptr){}
+mDataProvider(dataProvider), mEngine(nullptr), mContext(nullptr), mInputBufferDevice(nullptr), mOutputBufferDevice(nullptr),
+mTruthBufferHost(nullptr){}
 
 bool GhostDetection::initialize(const std::string& rootFile, const std::string& treeName, int32_t batchSize)
 {
     mDataProvider->load(rootFile, treeName, batchSize);
+    auto sampleSize = this->mDataProvider->input_variables()->n_events();
+
     if(mInputBufferDevice != nullptr)
     {
         cudaFree(mInputBufferDevice);
         mInputBufferDevice = nullptr;
     }
-    cudaMalloc(&mInputBufferDevice, mDataProvider->input_variables()->host_buffer_size() * batchSize);
+    cudaMalloc(&mInputBufferDevice, mDataProvider->input_variables()->device_buffer_size() * batchSize);
 
     if(mOutputBufferDevice != nullptr)
     {
         cudaFree(mOutputBufferDevice);
         mOutputBufferDevice = nullptr;
     }
-    cudaMalloc(&mOutputBufferDevice, sizeof(float) * batchSize);
+    cudaMalloc(&mOutputBufferDevice, sizeof(float) * sampleSize);
+
+    if(mTruthBufferHost != nullptr)
+    {
+        cudaFreeHost(mTruthBufferHost);
+        mTruthBufferHost = nullptr;
+    }
+    cudaHostAlloc(&mTruthBufferHost, sizeof(int32_t) * sampleSize, cudaHostAllocDefault);
+
     mContext->setOptimizationProfile(0);
     auto inputSize = mDataProvider->input_variables()->device_buffer_size() / sizeof(float);
     mContext->setBindingDimensions(0, nvinfer1::Dims2(batchSize, inputSize));
@@ -552,27 +570,20 @@ bool GhostDetection::build(const int32_t maxBatchSize)
 }
 
 
-bool GhostDetection::infer(int32_t nevent, int32_t batchSize, InferenceResult& result)
+InferenceResult GhostDetection::collect_results() const
 {
-    auto truths = mDataProvider->read_events(nevent, batchSize);
-    mDataProvider->fill_device_buffer(mInputBufferDevice, batchSize);
-    void* buffers[2];
-    buffers[0] = mInputBufferDevice;
-    buffers[1] = mOutputBufferDevice;
-
-    // Do inference, batch size 1
-    bool status = mContext->executeV2((void* const*)buffers);
-    if (!status)
-    {
-        return false;
-    }
-
-    std::vector<float> prediction(batchSize);
+    auto sampleSize = this->mDataProvider->input_variables()->n_events();
+    std::vector<float> prediction(sampleSize);
  
     // Memcpy from host input buffers to device input buffers
-    cudaMemcpy((void*)prediction.data(), mOutputBufferDevice, sizeof(float) * batchSize, cudaMemcpyDeviceToHost);
+    cudaMemcpy((void*)prediction.data(), mOutputBufferDevice, sizeof(float) * sampleSize, cudaMemcpyDeviceToHost);
 
-    for(int32_t i = 0; i < batchSize; ++i)
+    auto truths = (int32_t*)mTruthBufferHost;
+
+    InferenceResult result;
+    result.reset();
+
+    for(int32_t i = 0; i < sampleSize; ++i)
     {
         int32_t pred = prediction[i] < 0.5 ? 0 : 1;
         if(truths[i] == pred)
@@ -587,7 +598,23 @@ bool GhostDetection::infer(int32_t nevent, int32_t batchSize, InferenceResult& r
         }
     }
 
-    return true;
+    return result;
+}
+
+
+bool GhostDetection::infer(int32_t nevent, int32_t batchSize)
+{
+    auto clipBatch = std::min((int32_t)(this->mDataProvider->input_variables()->n_events()) - nevent - 1, batchSize);
+
+    mDataProvider->read_events(nevent, clipBatch, mTruthBufferHost + nevent * sizeof(int32_t));
+    mDataProvider->fill_device_buffer(mInputBufferDevice, clipBatch);
+
+    void* buffers[2];
+    buffers[0] = mInputBufferDevice;
+    buffers[1] = mOutputBufferDevice + nevent * sizeof(float);
+
+    // Do inference
+    return mContext->executeV2((void* const*)buffers);
 }
 
 
@@ -628,12 +655,9 @@ int main(int argc, char* argv[])
         return -1;
     }
 
-    InferenceResult result;
     for(auto it = batches.begin(); it != batches.end(); ++it)
     {
         std::cout<<"Benchmarking batch size "<<*it<<"..."<<std::endl;
-
-        result.reset();
 
         retVal = ghostinfer.initialize("../data/PrCheckerPlots.root","kalman_validator/kalman_ip_tree", *it);
         if ( !retVal )
@@ -645,11 +669,12 @@ int main(int argc, char* argv[])
         auto start = std::chrono::high_resolution_clock::now();
         for(int32_t i = 0; i < inputDataProvider->input_variables()->n_events(); i+=(*it))
         {
-            ghostinfer.infer(i, *it, result);
+            ghostinfer.infer(i, *it);
         }
         auto stop = std::chrono::high_resolution_clock::now();
 
         auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
+        auto result = ghostinfer.collect_results();
 //        if(it == batches.begin())
 //        {
             std::cout<<".............................................."<<std::endl;

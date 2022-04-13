@@ -97,6 +97,7 @@ def __main__():
     labels_ghosts = np.ones((len(data_ghosts), 1), dtype=int)
     labels = np.vstack((labels_tracks, labels_ghosts))
     data, labels = shuffle_data(rng, data, labels)
+    print(f"Shape of training/validation data: {data.shape}")
 
     # Keep 20% of data for testing
     test_point = int(len(data) * 0.8)

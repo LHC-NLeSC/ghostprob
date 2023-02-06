@@ -18,7 +18,7 @@
 
 // Constants
 const bool useFP16 = false;
-
+const bool useINT8 = false;
 
 struct InferDeleter
 {
@@ -483,10 +483,23 @@ bool GhostDetection::build(const int32_t maxBatchSize)
     }
     builder->setMaxBatchSize(maxBatchSize);
 
+    if( !useINT8 )
+    {
     // If necessary check that the GPU supports lower precision
     if ( useFP16 && !builder->platformHasFastFp16() )
     {
         return false;
+    }
+    if ( useINT8 )
+    {
+        if ( builder->platformHasFastInt8() )
+        {
+            builder->setInt8Mode(true);
+        }
+        else
+        {
+            return false;
+        }
     }
 
     // Create (empty) network
@@ -504,9 +517,12 @@ bool GhostDetection::build(const int32_t maxBatchSize)
         return false;
     }
     config->setMaxWorkspaceSize(1024 * (1 << 20));
-    if ( useFP16 )
+    if ( !useINT8 )
     {
-        config->setFlag(nvinfer1::BuilderFlag::kFP16);
+        if ( useFP16 )
+        {
+            config->setFlag(nvinfer1::BuilderFlag::kFP16);
+        }
     }
 
     nvinfer1::IOptimizationProfile* profile = builder->createOptimizationProfile();

@@ -22,6 +22,7 @@ def command_line():
     parser.add_argument("--normalize", help="Use a normalization layer", action="store_true")
     # Analysis
     parser.add_argument("--plot", help="Plot accuracy over time", action="store_true")
+    parser.add_argument("--int8", help="Quantize the trained model to INT8", action="store_true")
     parser.add_argument("--save", help="Save the trained model to disk", action="store_true")
     return parser.parse_args()
 
@@ -173,6 +174,20 @@ if arguments.plot:
     plt.legend(loc="lower right")
     plt.show()
 
+# INT8 quantization
+if arguments.int8:
+    print("INT8 quantization")
+    def representative_data_gen():
+        for input_value in tf.data.Dataset.from_tensor_slices(data_test).batch(1).take(100):
+            yield [input_value]
+    converter = tf.lite.TFLiteConverter.from_keras_model(model)
+    converter.optimizations = [tf.lite.Optimize.DEFAULT]
+    converter.representative_dataset = representative_data_gen
+    converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS_INT8]
+    converter.inference_input_type = tf.int8
+    converter.inference_output_type = tf.int8
+    int8_model = converter.convert()
+
 if arguments.save:
     print("Saving model to disk")
     model.save("train_ghostprob_model.h5")
@@ -180,3 +195,9 @@ if arguments.save:
     input_signature = [tf.TensorSpec(input.shape, input.dtype) for input in model.inputs]
     model_onnx, _ = tf2onnx.convert.from_keras(model, input_signature)
     onnx.save(model_onnx, "train_ghostprob_model.onnx")
+    if arguments.int8:
+        print("Saving INT8 model to disk")
+        open("train_ghostprob_int8_model.tflite", "wb").write(int8_model)
+        print("Saving INT8 model to ONNX format")
+        model_onnx, _ = tf2onnx.convert.from_tflite("train_ghostprob_int8_model.tflite")
+        onnx.save(model_onnx, "train_ghostprob_int8_model.onnx")

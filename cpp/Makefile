@@ -1,5 +1,6 @@
 CXX		:= $(shell which g++)
 ROOTCONFIG	:= $(shell which root-config)
+CUDA_ROOT	:= $(shell dirname ${CUDACXX})/../
 
 CXXSTD		:= -std=c++17
 OPTS		:= -g
@@ -11,16 +12,16 @@ ROOTFLAGS	:= $(shell $(ROOTCONFIG) --libs)
 CXXFLAGS	:= $(CUINCLUDES) $(CXXSTD) $(OPTS)
 LDFLAGS		:= $(CUFLAGS) $(ROOTFLAGS)
 
-SRCS		:= $(wildcard src/*.cu)
+SRCS		:= $(wildcard *.cpp)
 
 .PHONY: all clean
 
 all:	main
 
-main:	$(SRCS:%.cu=%.o)
+main:	$(SRCS:%.cpp=%.o)
 	$(CXX) -o main $< $(LDFLAGS)
 
-$(SRCS:%.cu=%.o):%.o: %.cu
+$(SRCS:%.cpp=%.o):%.o: %.cpp
 	$(CXX) -o $@ -c $(CXXFLAGS) $<
 
 clean: 

@@ -424,6 +424,10 @@ class GhostDetection
 
     private:
 
+        bool setDynamicRange(std::unique_ptr<nvinfer1::INetworkDefinition, InferDeleter>&);
+
+        void setLayerPrecision(std::unique_ptr<nvinfer1::INetworkDefinition, InferDeleter>&);
+
         std::string mEngineFilename;
 
         InputDataProvider* mDataProvider;
@@ -524,6 +528,22 @@ bool GhostDetection::build(const int32_t maxBatchSize)
             config->setFlag(nvinfer1::BuilderFlag::kFP16);
         }
     }
+    else
+    {
+        config->setFlag(nvinfer1::BuilderFlag::kINT8);
+        // Mark calibrator as null. As user provides dynamic range for each tensor, no calibrator is required
+        config->setInt8Calibrator(nullptr);
+
+        // force layer to execute with required precision
+        setLayerPrecision(network);
+
+        // set INT8 Per Tensor Dynamic range
+        if (!setDynamicRange(network))
+        {
+            std::cerr << "Unable to set per-tensor dynamic range." << std::endl;
+            return false;
+        }
+    }
 
     nvinfer1::IOptimizationProfile* profile = builder->createOptimizationProfile();
     auto inputSize = mDataProvider->input_variables()->device_buffer_size() / sizeof(float);
@@ -585,6 +605,109 @@ bool GhostDetection::build(const int32_t maxBatchSize)
 
     return true;
 }
+
+
+bool GhostDetection::setDynamicRange(std::unique_ptr<nvinfer1::INetworkDefinition, InferDeleter>& network)
+{
+    std::cerr << "Setting Per Tensor Dynamic Range" << std::endl;
+
+    // set dynamic range for network input tensors
+    network->getInput(0)->setDynamicRange(-10., 10.);
+
+    network->getInput(1)->setDynamicRange(-10., 10.);
+    network->getInput(2)->setDynamicRange(-0.3, 0.3);
+    network->getInput(3)->setDynamicRange(-0.3, 0.3);
+    network->getInput(4)->setDynamicRange(0., 1.);
+    network->getInput(5)->setDynamicRange(0., 15000.);
+    network->getInput(6)->setDynamicRange(-0.5, 10000.5);
+    network->getInput(7)->setDynamicRange(-0.5, 25.5);
+    network->getInput(8)->setDynamicRange(0., 400.);
+    network->getInput(9)->setDynamicRange(0., 150.);
+    network->getInput(10)->setDynamicRange(0., 150.);
+    network->getInput(11)->setDynamicRange(0., 150.);
+    network->getInput(12)->setDynamicRange(0.,10.);
+    network->getInput(13)->setDynamicRange(0.,10.);
+    network->getInput(14)->setDynamicRange(0.,10.);
+    network->getInput(15)->setDynamicRange(0.,10.);
+    network->getInput(16)->setDynamicRange(0.,1.);
+
+
+    // set dynamic range for layer output tensors
+    network->getOutput(0)->setDynamicRange(0.,1.);
+
+    for (int i = 0; i < network->getNbLayers(); ++i)
+    {
+        auto lyr = network->getLayer(i);
+        for (int j = 0, e = lyr->getNbOutputs(); j < e; ++j)
+        {
+            if (lyr->getType() == nvinfer1::LayerType::kCONSTANT)
+            {
+                IConstantLayer* cLyr = static_cast<IConstantLayer*>(lyr);
+                auto wts = cLyr->getWeights();
+                double max = std::numeric_limits<double>::min();
+                for (int64_t wb = 0, we = wts.count; wb < we; ++wb)
+                {
+                    double val{};
+                    switch (wts.type)
+                    {
+                        case nvinfer1::DataType::kFLOAT: val = static_cast<const float*>(wts.values)[wb]; break;
+                        case nvinfer1::DataType::kBOOL: val = static_cast<const bool*>(wts.values)[wb]; break;
+                        case nvinfer1::DataType::kINT8: val = static_cast<const int8_t*>(wts.values)[wb]; break;
+                        case nvinfer1::DataType::kHALF: val = static_cast<const half_float::half*>(wts.values)[wb]; break;
+                        case nvinfer1::DataType::kINT32: val = static_cast<const int32_t*>(wts.values)[wb]; break;
+                    }
+                    max = std::max(max, std::abs(val));
+                }
+                if (!lyr->getOutput(j)->setDynamicRange(-max, max))
+                {
+                    return false;
+                }
+            }
+            else
+            {
+                double max=128.; // completely random, we use this for perf testing only
+                if (!lyr->getOutput(j)->setDynamicRange(-max, max))
+                {
+                    return false;
+                }
+            }
+        }
+    }
+    return true;
+}
+
+void GhostDetection::setLayerPrecision(std::unique_ptr<nvinfer1::INetworkDefinition, InferDeleter>& network)
+{
+    std::cerr << "Setting Per Layer Computation Precision" << std::endl;
+    for (int i = 0; i < network->getNbLayers(); ++i)
+    {
+        auto layer = network->getLayer(i);
+
+        std::string layerName = layer->getName();
+        std::cout << "Layer: " << layerName << ". Precision: INT8" << std::endl;
+
+        // Don't set the precision on non-computation layers as they don't support
+        // int8.
+        if (layer->getType() != nvinfer1::LayerType::kCONSTANT && layer->getType() != nvinfer1::LayerType::kCONCATENATION
+            && layer->getType() != nvinfer1::LayerType::kSHAPE)
+        {
+            // set computation precision of the layer
+            layer->setPrecision(nvinfer1::DataType::kINT8);
+        }
+
+        for (int j = 0; j < layer->getNbOutputs(); ++j)
+        {
+            std::string tensorName = layer->getOutput(j)->getName();
+            std::cout << "Tensor: " << tensorName << ". OutputType: INT8" << std::endl;
+            // set output type of execution tensors and not shape tensors.
+            if (layer->getOutput(j)->isExecutionTensor())
+            {
+                layer->setOutputType(j, nvinfer1::DataType::kINT8);
+            }
+        }
+    }
+}
+
 
 
 InferenceResult GhostDetection::collect_results() const

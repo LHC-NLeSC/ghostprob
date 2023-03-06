@@ -17,7 +17,7 @@
 #include "TFile.h"
 
 // Constants
-const bool useFP16 = false;
+const bool useFP16 = true;
 const bool useINT8 = false;
 
 struct InferDeleter
@@ -489,18 +489,15 @@ bool GhostDetection::build(const int32_t maxBatchSize)
 
     if( !useINT8 )
     {
-    // If necessary check that the GPU supports lower precision
-    if ( useFP16 && !builder->platformHasFastFp16() )
-    {
-        return false;
+        // If necessary check that the GPU supports lower precision
+        if ( useFP16 && !builder->platformHasFastFp16() )
+        {
+            return false;
+        }
     }
     if ( useINT8 )
     {
-        if ( builder->platformHasFastInt8() )
-        {
-            builder->setInt8Mode(true);
-        }
-        else
+        if ( !builder->platformHasFastInt8() )
         {
             return false;
         }
@@ -533,16 +530,6 @@ bool GhostDetection::build(const int32_t maxBatchSize)
         config->setFlag(nvinfer1::BuilderFlag::kINT8);
         // Mark calibrator as null. As user provides dynamic range for each tensor, no calibrator is required
         config->setInt8Calibrator(nullptr);
-
-        // force layer to execute with required precision
-        setLayerPrecision(network);
-
-        // set INT8 Per Tensor Dynamic range
-        if (!setDynamicRange(network))
-        {
-            std::cerr << "Unable to set per-tensor dynamic range." << std::endl;
-            return false;
-        }
     }
 
     nvinfer1::IOptimizationProfile* profile = builder->createOptimizationProfile();
@@ -575,6 +562,19 @@ bool GhostDetection::build(const int32_t maxBatchSize)
     {
         return false;
     }
+    if(useINT8)
+    {
+
+        // force layer to execute with required precision
+        setLayerPrecision(network);
+
+        // set INT8 Per Tensor Dynamic range
+        if (!setDynamicRange(network))
+        {
+            std::cerr << "Unable to set per-tensor dynamic range." << std::endl;
+            return false;
+        }
+    }
 
     // Do the actual building of the network
     std::unique_ptr<nvinfer1::IHostMemory, InferDeleter> plan{builder->buildSerializedNetwork(*network, *config)};
@@ -582,6 +582,7 @@ bool GhostDetection::build(const int32_t maxBatchSize)
     {
         return false;
     }
+
 
     // Create inference runtime
     std::unique_ptr<nvinfer1::IRuntime, InferDeleter> runtime{nvinfer1::createInferRuntime(ghost_logger)};
@@ -606,15 +607,14 @@ bool GhostDetection::build(const int32_t maxBatchSize)
     return true;
 }
 
-
 bool GhostDetection::setDynamicRange(std::unique_ptr<nvinfer1::INetworkDefinition, InferDeleter>& network)
 {
-    std::cerr << "Setting Per Tensor Dynamic Range" << std::endl;
+    std::cerr << "Setting Per Tensor Dynamic Range for " << network->getNbInputs() << "inputs..." << std::endl;
 
     // set dynamic range for network input tensors
     network->getInput(0)->setDynamicRange(-10., 10.);
 
-    network->getInput(1)->setDynamicRange(-10., 10.);
+/*    network->getInput(1)->setDynamicRange(-10., 10.);
     network->getInput(2)->setDynamicRange(-0.3, 0.3);
     network->getInput(3)->setDynamicRange(-0.3, 0.3);
     network->getInput(4)->setDynamicRange(0., 1.);
@@ -629,7 +629,8 @@ bool GhostDetection::setDynamicRange(std::unique_ptr<nvinfer1::INetworkDefinitio
     network->getInput(13)->setDynamicRange(0.,10.);
     network->getInput(14)->setDynamicRange(0.,10.);
     network->getInput(15)->setDynamicRange(0.,10.);
-    network->getInput(16)->setDynamicRange(0.,1.);
+*/
+//    network->getInput(16)->setDynamicRange(0.,1.);
 
 
     // set dynamic range for layer output tensors
@@ -642,7 +643,7 @@ bool GhostDetection::setDynamicRange(std::unique_ptr<nvinfer1::INetworkDefinitio
         {
             if (lyr->getType() == nvinfer1::LayerType::kCONSTANT)
             {
-                IConstantLayer* cLyr = static_cast<IConstantLayer*>(lyr);
+                auto cLyr = static_cast<nvinfer1::IConstantLayer*>(lyr);
                 auto wts = cLyr->getWeights();
                 double max = std::numeric_limits<double>::min();
                 for (int64_t wb = 0, we = wts.count; wb < we; ++wb)
@@ -653,7 +654,7 @@ bool GhostDetection::setDynamicRange(std::unique_ptr<nvinfer1::INetworkDefinitio
                         case nvinfer1::DataType::kFLOAT: val = static_cast<const float*>(wts.values)[wb]; break;
                         case nvinfer1::DataType::kBOOL: val = static_cast<const bool*>(wts.values)[wb]; break;
                         case nvinfer1::DataType::kINT8: val = static_cast<const int8_t*>(wts.values)[wb]; break;
-                        case nvinfer1::DataType::kHALF: val = static_cast<const half_float::half*>(wts.values)[wb]; break;
+//                        case nvinfer1::DataType::kHALF: val = static_cast<const nvinfer1::half_float::half*>(wts.values)[wb]; break;
                         case nvinfer1::DataType::kINT32: val = static_cast<const int32_t*>(wts.values)[wb]; break;
                     }
                     max = std::max(max, std::abs(val));

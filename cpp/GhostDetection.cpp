@@ -17,7 +17,7 @@
 #include "TFile.h"
 
 // Constants
-const bool useFP16 = true;
+const bool useFP16 = false;
 const bool useINT8 = false;
 
 struct InferDeleter
@@ -523,11 +523,13 @@ bool GhostDetection::build(const int32_t maxBatchSize)
         if ( useFP16 )
         {
             config->setFlag(nvinfer1::BuilderFlag::kFP16);
+            config->setFlag(nvinfer1::BuilderFlag::kPREFER_PRECISION_CONSTRAINTS);
         }
     }
     else
     {
         config->setFlag(nvinfer1::BuilderFlag::kINT8);
+        config->setFlag(nvinfer1::BuilderFlag::kPREFER_PRECISION_CONSTRAINTS);
         // Mark calibrator as null. As user provides dynamic range for each tensor, no calibrator is required
         config->setInt8Calibrator(nullptr);
     }

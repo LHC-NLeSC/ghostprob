@@ -1,8 +1,8 @@
 import argparse
 import numpy as np
 
-import data
 from utilities import load_data, shuffle_data
+from data import label, training_columns
 
 
 def command_line():
@@ -25,17 +25,17 @@ def __main__():
     dataframe, columns = load_data(arguments.filename)
     print(f"Columns in the table: {len(dataframe)}")
     print(columns)
-    if data.label not in columns:
+    if label not in columns:
         print("Missing labels.")
         return
-    labels = dataframe[data.label].astype(int)
-    for column in data.training_columns:
+    labels = dataframe[label].astype(int)
+    for column in training_columns:
         if column not in columns:
             print("Missing training data.")
             return
-    trainining_columns = data.training_columns
+    trainining_columns = training_columns
     print(f"Columns for training: {len(trainining_columns)}")
-    print(f"Entries in the table: {len(dataframe[data.label])}")
+    print(f"Entries in the table: {len(dataframe[label])}")
     data = [dataframe[column] for column in trainining_columns]
     # split into real and ghost tracks
     data = np.hstack([data[i].reshape(len(data[0]), 1) for i in range(len(data))])

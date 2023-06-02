@@ -8,8 +8,7 @@ import onnx2torch
 
 from utilities import load_data, shuffle_data, GhostDataset, testing_loop
 from networks import GhostNetwork
-import data
-
+from data import label, training_columns
 
 def command_line():
     parser = argparse.ArgumentParser()
@@ -40,16 +39,16 @@ def __main__():
         dataframe, columns = load_data(arguments.filename)
         print(f"Columns in the table: {len(dataframe)}")
         print(columns)
-        if data.label not in columns:
+        if label not in columns:
             print("Missing labels.")
             return
-        labels = dataframe[data.label].astype(int)
-        for column in data.training_columns:
+        labels = dataframe[label].astype(int)
+        for column in training_columns:
             if column not in columns:
                 print("Missing data.")
                 return
         # create dataset
-        data = [dataframe[column] for column in data.training_columns]
+        data = [dataframe[column] for column in training_columns]
         # split into ghost and real tracks
         data = np.hstack([data[i].reshape(len(data[0]), 1) for i in range(len(data))])
         data_ghost = data[labels == 1]

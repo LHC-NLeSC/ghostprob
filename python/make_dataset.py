@@ -37,6 +37,13 @@ def __main__():
     print(f"Columns for training: {len(trainining_columns)}")
     print(f"Entries in the table: {len(dataframe[label])}")
     data = [dataframe[column] for column in trainining_columns]
+    # Remove NaNs
+    for _, column in enumerate(data):
+        index = np.isfinite(column)
+        if len(np.unique(index)) == 2:
+            for j_col in range(len(data)):
+                data[j_col] = data[j_col][index]
+            labels = labels[index]
     # split into real and ghost tracks
     data = np.hstack([data[i].reshape(len(data[0]), 1) for i in range(len(data))])
     data_ghost = data[labels == 1]

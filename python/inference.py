@@ -49,6 +49,13 @@ def __main__():
                 return
         # create dataset
         data = [dataframe[column] for column in training_columns]
+        # Remove NaNs
+        for _, column in enumerate(data):
+            index = np.isfinite(column)
+            if len(np.unique(index)) == 2:
+                for j_col in range(len(data)):
+                    data[j_col] = data[j_col][index]
+                labels = labels[index]
         # split into ghost and real tracks
         data = np.hstack([data[i].reshape(len(data[0]), 1) for i in range(len(data))])
         data_ghost = data[labels == 1]

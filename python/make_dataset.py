@@ -1,7 +1,7 @@
 import argparse
 import numpy as np
 
-from utilities import load_data, shuffle_data
+from utilities import load_data, shuffle_data, remove_nans
 from data import label, training_columns
 
 
@@ -38,12 +38,7 @@ def __main__():
     print(f"Entries in the table: {len(dataframe[label])}")
     data = [dataframe[column] for column in trainining_columns]
     # Remove NaNs
-    for _, column in enumerate(data):
-        index = np.isfinite(column)
-        if len(np.unique(index)) == 2:
-            for j_col in range(len(data)):
-                data[j_col] = data[j_col][index]
-            labels = labels[index]
+    data, labels = remove_nans(data, labels)
     # split into real and ghost tracks
     data = np.hstack([data[i].reshape(len(data[0]), 1) for i in range(len(data))])
     data_ghost = data[labels == 1]

@@ -1,5 +1,6 @@
 from ROOT import TFile, RDataFrame
 import torch
+import numpy as np
 from torch.utils.data import Dataset
 
 
@@ -51,3 +52,13 @@ def testing_loop(model, dataloader, loss_function):
     epoch_loss = epoch_loss / len(dataloader)
     accuracy = accuracy / len(dataloader)
     return accuracy, epoch_loss
+
+
+def remove_nans(data, labels):
+    for _, column in enumerate(data):
+        index = np.isfinite(column)
+        if len(np.unique(index)) == 2:
+            for j_col in range(len(data)):
+                data[j_col] = data[j_col][index]
+            labels = labels[index]
+    return data, labels

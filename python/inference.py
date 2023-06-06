@@ -6,9 +6,10 @@ from torch import nn
 from torch.utils.data import DataLoader
 import onnx2torch
 
-from utilities import load_data, shuffle_data, GhostDataset, testing_loop
+from utilities import load_data, shuffle_data, GhostDataset, testing_loop, remove_nans
 from networks import GhostNetwork
 from data import label, training_columns
+
 
 def command_line():
     parser = argparse.ArgumentParser()
@@ -50,12 +51,7 @@ def __main__():
         # create dataset
         data = [dataframe[column] for column in training_columns]
         # Remove NaNs
-        for _, column in enumerate(data):
-            index = np.isfinite(column)
-            if len(np.unique(index)) == 2:
-                for j_col in range(len(data)):
-                    data[j_col] = data[j_col][index]
-                labels = labels[index]
+        data, labels = remove_nans(data, labels)
         # split into ghost and real tracks
         data = np.hstack([data[i].reshape(len(data[0]), 1) for i in range(len(data))])
         data_ghost = data[labels == 1]

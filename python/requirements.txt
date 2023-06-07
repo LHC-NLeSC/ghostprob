@@ -1,6 +1,6 @@
-tensorflow
+torch
 matplotlib
 onnx
-tf2onnx
+onnx2torch
 numpy
 ROOT

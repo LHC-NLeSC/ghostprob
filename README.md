@@ -13,7 +13,7 @@ make
 
 ## python
 
-This directory contains the Python and TensorFlow script to train a NN model to detect ghost tracks.
+This directory contains the PyTorch scripts to train a NN model to detect ghost tracks.
 
 ## data
 

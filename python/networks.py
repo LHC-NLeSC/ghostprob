@@ -30,8 +30,9 @@ class RoelOriginalNetwork(nn.Module):
         self.quant = torch.quantization.QuantStub()
         self.norm = nn.BatchNorm1d(num_features)
         self.layer0 = nn.Linear(num_features, int(1.5 * num_features))
+        self.relu = nn.ReLU()
         self.drop = nn.Dropout(0.1)
-        self.output = nn.Linear(int((num_features + 1) / 2), 1)
+        self.output = nn.Linear(int(1.5 * num_features), 1)
         self.sigmoid = nn.Sigmoid()
         self.dequant = torch.quantization.DeQuantStub()
 

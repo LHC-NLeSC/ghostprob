@@ -28,5 +28,4 @@ training_columns = [
     "ndofV",
     "ndofT",
     "nUT",
-    "mcp_p",
 ]

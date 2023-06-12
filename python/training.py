@@ -92,7 +92,8 @@ def __main__():
     best_weights = None
     start_time = perf_counter()
     for epoch in range(0, num_epochs):
-        print(f"Epoch {epoch + 1}/{num_epochs}")
+        if arguments.verbose:
+            print(f"Epoch {epoch + 1}/{num_epochs}")
         training_loop(model, training_dataloader, loss_function, optimizer)
         accuracy, loss = testing_loop(model, validation_dataloader, loss_function)
         accuracy_history.append(accuracy * 100.0)

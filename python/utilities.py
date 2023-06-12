@@ -32,9 +32,9 @@ def shuffle_data(rng, data, labels):
 def training_loop(model, dataloader, loss_function, optimizer):
     model.train()
     for x, y in dataloader:
+        optimizer.zero_grad()
         prediction = model(x)
         loss = loss_function(prediction, y)
-        optimizer.zero_grad()
         loss.backward()
         optimizer.step()
 

@@ -25,7 +25,8 @@ def command_line():
     parser.add_argument("--epochs", help="Number of epochs", type=int, default=1024)
     parser.add_argument("--batch", help="Batch size", type=int, default=512)
     parser.add_argument("--learning", help="Learning rate", type=float, default=1e-3)
-    # data
+    # misc
+    parser.add_argument("-v", "--verbose", help="Verbose", action="store_true")
     parser.add_argument(
         "--int8", help="Quantize the trained model to INT8", action="store_true"
     )
@@ -69,7 +70,7 @@ def __main__():
     test_dataloader = DataLoader(test_dataset, batch_size=arguments.batch)
     # model
     num_features = data_train.shape[1]
-    model = GhostNetwork(num_features=num_features, l0=int(num_features * 2.5))
+    model = GhostNetwork(num_features, l0=int(num_features * 2.5))
     print(f"Device: {device}")
     model.to(device)
     print()
@@ -96,8 +97,9 @@ def __main__():
         accuracy, loss = testing_loop(model, validation_dataloader, loss_function)
         accuracy_history.append(accuracy * 100.0)
         loss_history.append(loss)
-        print(f"\tAccuracy: {accuracy * 100.0:.2f}%")
-        print(f"\tLoss: {loss:.6f}")
+        if arguments.verbose:
+            print(f"\tAccuracy: {accuracy * 100.0:.2f}%")
+            print(f"\tLoss: {loss:.6f}")
         if accuracy > best_accuracy:
             best_accuracy = accuracy
             best_weights = copy.deepcopy(model.state_dict())

@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import torch
 from torch.utils.data import DataLoader
 from torch import nn
+from tqdm import tqdm
 
 from utilities import GhostDataset, training_loop, testing_loop
 from networks import GhostNetwork
@@ -26,7 +27,6 @@ def command_line():
     parser.add_argument("--batch", help="Batch size", type=int, default=512)
     parser.add_argument("--learning", help="Learning rate", type=float, default=1e-3)
     # misc
-    parser.add_argument("-v", "--verbose", help="Verbose", action="store_true")
     parser.add_argument(
         "--int8", help="Quantize the trained model to INT8", action="store_true"
     )
@@ -84,6 +84,7 @@ def __main__():
     batch_size = arguments.batch
     print(f"Number of epochs: {num_epochs}")
     print(f"Batch size: {batch_size}")
+    print()
     loss_function = nn.BCELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=arguments.learning)
     best_accuracy = -np.inf
@@ -91,16 +92,11 @@ def __main__():
     loss_history = list()
     best_weights = None
     start_time = perf_counter()
-    for epoch in range(0, num_epochs):
-        if arguments.verbose:
-            print(f"Epoch {epoch + 1}/{num_epochs}")
+    for _ in tqdm(range(0, num_epochs)):
         training_loop(model, training_dataloader, loss_function, optimizer)
         accuracy, loss = testing_loop(model, validation_dataloader, loss_function)
         accuracy_history.append(accuracy * 100.0)
         loss_history.append(loss)
-        if arguments.verbose:
-            print(f"\tAccuracy: {accuracy * 100.0:.2f}%")
-            print(f"\tLoss: {loss:.6f}")
         if accuracy > best_accuracy:
             best_accuracy = accuracy
             best_weights = copy.deepcopy(model.state_dict())

@@ -69,7 +69,7 @@ def __main__():
     test_dataloader = DataLoader(test_dataset, batch_size=arguments.batch)
     # model
     num_features = data_train.shape[1]
-    model = GhostNetwork(num_features=num_features)
+    model = GhostNetwork(num_features=num_features, l0=int(num_features * 2.5))
     print(f"Device: {device}")
     model.to(device)
     print()

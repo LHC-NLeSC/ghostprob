@@ -3,13 +3,13 @@ from torch import nn
 
 
 class GhostNetwork(nn.Module):
-    def __init__(self, num_features):
+    def __init__(self, num_features, l0=32):
         super(GhostNetwork, self).__init__()
         self.quant = torch.quantization.QuantStub()
         self.norm = nn.BatchNorm1d(num_features)
-        self.layer0 = nn.Linear(num_features, int((num_features + 1) / 2))
+        self.layer0 = nn.Linear(num_features, l0)
         self.relu = nn.ReLU()
-        self.output = nn.Linear(int((num_features + 1) / 2), 1)
+        self.output = nn.Linear(l0, 1)
         self.sigmoid = nn.Sigmoid()
         self.dequant = torch.quantization.DeQuantStub()
 

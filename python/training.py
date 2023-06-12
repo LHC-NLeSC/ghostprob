@@ -109,7 +109,7 @@ def __main__():
     print()
     accuracy, loss = testing_loop(model, test_dataloader, loss_function)
     print(f"Test Accuracy: {accuracy * 100.0:.2f}%")
-    print(f"Test Loss: {loss:.6f}%")
+    print(f"Test Loss: {loss:.6f}")
     print()
     # plotting
     if arguments.plot:

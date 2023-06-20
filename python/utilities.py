@@ -1,7 +1,10 @@
 from ROOT import TFile, RDataFrame
 import torch
 import numpy as np
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
+from ray.air import Checkpoint, session
+
+from networks import GhostNetwork
 
 
 class GhostDataset(Dataset):
@@ -29,14 +32,43 @@ def shuffle_data(rng, data, labels):
     return data[permutation], labels[permutation]
 
 
-def training_loop(model, dataloader, loss_function, optimizer):
-    model.train()
-    for x, y in dataloader:
-        optimizer.zero_grad()
-        prediction = model(x)
-        loss = loss_function(prediction, y)
-        loss.backward()
-        optimizer.step()
+def training_loop(config, num_features, device, loss_function, training_dataset, validation_dataset
+):
+    training_dataloader = DataLoader(training_dataset, batch_size=int(config["batch"]))
+    validation_dataloader = DataLoader(validation_dataset, batch_size=int(config["batch"]))
+    # model
+    model = GhostNetwork(num_features, l0=config["l0"])
+    optimizer = torch.optim.Adam(model.parameters(), lr=config["learning"])
+    model.to(device)
+    # checkpointing
+    checkpoint = session.get_checkpoint()
+    if checkpoint:
+        checkpoint_state = checkpoint.to_dict()
+        start_epoch = checkpoint_state["epoch"]
+        model.load_state_dict(checkpoint_state["net_state_dict"])
+        optimizer.load_state_dict(checkpoint_state["optimizer_state_dict"])
+    else:
+        start_epoch = 0
+    num_epochs = config["epochs"]
+    for epoch in range(start_epoch, num_epochs):
+        model.train()
+        for x, y in training_dataloader:
+            optimizer.zero_grad()
+            prediction = model(x)
+            loss = loss_function(prediction, y)
+            loss.backward()
+            optimizer.step()
+        accuracy, loss = testing_loop(model, validation_dataloader, loss_function)
+        checkpoint_data = {
+            "epoch": epoch,
+            "net_state_dict": model.state_dict(),
+            "optimizer_state_dict": optimizer.state_dict(),
+        }
+        checkpoint = Checkpoint.from_dict(checkpoint_data)
+        session.report(
+            {"loss": loss, "accuracy": accuracy},
+            checkpoint=checkpoint,
+        )
 
 
 def testing_loop(model, dataloader, loss_function):
@@ -55,10 +87,13 @@ def testing_loop(model, dataloader, loss_function):
 
 
 def remove_nans(data, labels):
+    corrected_columns = 0
     for _, column in enumerate(data):
         index = np.isfinite(column)
         if len(np.unique(index)) == 2:
+            corrected_columns += 1
             for j_col in range(len(data)):
                 data[j_col] = data[j_col][index]
             labels = labels[index]
+    print(f"Number of columns with NaN: {corrected_columns}")
     return data, labels

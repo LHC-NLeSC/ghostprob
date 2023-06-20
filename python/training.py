@@ -1,16 +1,17 @@
 import argparse
-import copy
-from time import perf_counter
+from functools import partial
 import numpy as np
-import matplotlib.pyplot as plt
 import torch
 from torch.utils.data import DataLoader
 from torch import nn
-from tqdm import tqdm
+from ray import tune
+from ray.tune import CLIReporter
+from ray.tune.schedulers import ASHAScheduler
 
 from utilities import GhostDataset, training_loop, testing_loop
 from networks import GhostNetwork
 
+NUM_SAMPLES = 64
 
 def command_line():
     parser = argparse.ArgumentParser()
@@ -24,13 +25,10 @@ def command_line():
     parser.add_argument("--nocuda", help="Disable CUDA", action="store_true")
     # parameters
     parser.add_argument("--epochs", help="Number of epochs", type=int, default=1024)
-    parser.add_argument("--batch", help="Batch size", type=int, default=512)
-    parser.add_argument("--learning", help="Learning rate", type=float, default=1e-3)
     # misc
     parser.add_argument(
         "--int8", help="Quantize the trained model to INT8", action="store_true"
     )
-    parser.add_argument("--plot", help="Plot accuracy over time", action="store_true")
     parser.add_argument(
         "--save", help="Save the trained model to disk", action="store_true"
     )
@@ -43,6 +41,7 @@ def __main__():
         device = torch.device("cuda")
     else:
         device = torch.device("cpu")
+    print(f"Device: {device}")
     # create training, validation, and testing data sets
     data_train = np.load(f"{arguments.filename}_train_data.npy")
     labels_train = np.load(f"{arguments.filename}_train_labels.npy")
@@ -65,13 +64,47 @@ def __main__():
         torch.tensor(data_test, dtype=torch.float32, device=device),
         torch.tensor(labels_test, dtype=torch.float32, device=device),
     )
-    training_dataloader = DataLoader(training_dataset, batch_size=arguments.batch)
-    validation_dataloader = DataLoader(validation_dataset, batch_size=arguments.batch)
-    test_dataloader = DataLoader(test_dataset, batch_size=arguments.batch)
-    # model
+    # Training and tuning hyperparameters
     num_features = data_train.shape[1]
-    model = GhostNetwork(num_features, l0=int(num_features * 2.5))
-    print(f"Device: {device}")
+    num_epochs = arguments.epochs
+    tuning_config = {
+        "l0": tune.choice(
+            [i for i in range(int(num_features / 2), int(num_features * 10))]
+        ),
+        "learning": tune.loguniform(1e-6, 1),
+        "batch": tune.choice([2**i for i in range(1, 15)]),
+        "epochs": tune.choice([num_epochs]),
+    }
+    scheduler = ASHAScheduler(
+        metric="loss",
+        mode="min",
+        max_t=num_epochs,
+        grace_period=1,
+        reduction_factor=2,
+    )
+    reporter = CLIReporter(
+        metric_columns=["loss", "accuracy", "training_iteration"])
+    loss_function = nn.BCELoss()
+    result = tune.run(
+        partial(training_loop, num_features=num_features,
+            device=device,
+            loss_function=loss_function,
+            training_dataset=training_dataset,
+            validation_dataset=validation_dataset),
+        config=tuning_config,
+        num_samples=NUM_SAMPLES,
+        scheduler=scheduler,
+        storage_path="./ray_logs",
+        checkpoint_score_attr="loss",
+        progress_reporter=reporter,
+    )
+    best_trial = result.get_best_trial("loss", "min", "last")
+    print(f"Best trial config: {best_trial.config}")
+    print(f"Best trial final validation loss: {best_trial.last_result['loss']}")
+    print(f"Best trial final validation accuracy: {best_trial.last_result['accuracy']}")
+    # Test accuracy
+    test_dataloader = DataLoader(test_dataset, batch_size=best_trial.config["batch"])
+    model = GhostNetwork(num_features, l0=best_trial.config["l0"])
     model.to(device)
     print()
     print(model)
@@ -79,50 +112,10 @@ def __main__():
         f"Model parameters: {sum([x.reshape(-1).shape[0] for x in model.parameters()])}"
     )
     print()
-    # training and testing
-    num_epochs = arguments.epochs
-    batch_size = arguments.batch
-    print(f"Number of epochs: {num_epochs}")
-    print(f"Batch size: {batch_size}")
-    print()
-    loss_function = nn.BCELoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=arguments.learning)
-    best_accuracy = -np.inf
-    accuracy_history = list()
-    loss_history = list()
-    best_weights = None
-    start_time = perf_counter()
-    for _ in tqdm(range(0, num_epochs)):
-        training_loop(model, training_dataloader, loss_function, optimizer)
-        accuracy, loss = testing_loop(model, validation_dataloader, loss_function)
-        accuracy_history.append(accuracy * 100.0)
-        loss_history.append(loss)
-        if accuracy > best_accuracy:
-            best_accuracy = accuracy
-            best_weights = copy.deepcopy(model.state_dict())
-    end_time = perf_counter()
-    model.load_state_dict(best_weights)
-    print()
-    print(f"Training time: {end_time - start_time:.2f} seconds")
-    print(f"Best Accuracy: {best_accuracy * 100.0:.2f}%")
-    print()
     accuracy, loss = testing_loop(model, test_dataloader, loss_function)
     print(f"Test Accuracy: {accuracy * 100.0:.2f}%")
     print(f"Test Loss: {loss:.6f}")
     print()
-    # plotting
-    if arguments.plot:
-        epochs = np.arange(0, num_epochs)
-        plt.plot(epochs, accuracy_history, "r", label="Validation accuracy")
-        plt.xlabel("Epochs")
-        plt.ylabel("Validation Accuracy")
-        plt.legend(loc="lower right")
-        plt.show()
-        plt.plot(epochs, loss_history, "r", label="Validation loss")
-        plt.xlabel("Epochs")
-        plt.ylabel("Validation Loss")
-        plt.legend(loc="upper right")
-        plt.show()
     # save model
     if arguments.save:
         print("Saving model to disk")
@@ -137,7 +130,7 @@ def __main__():
         model_fused = torch.quantization.fuse_modules(model, [["layer0", "relu"]])
         model_prepared = torch.quantization.prepare_qat(model_fused.train())
         for epoch in range(0, num_epochs):
-            training_loop(model_prepared, training_dataloader, loss_function, optimizer)
+            training_loop()
         model_prepared.eval()
         model_int8 = torch.quantization.convert(model_prepared)
         print()

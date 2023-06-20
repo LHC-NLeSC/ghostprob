@@ -24,9 +24,11 @@ def command_line():
     )
     parser.add_argument("--nocuda", help="Disable CUDA", action="store_true")
     # parameters
-    parser.add_argument("--epochs", help="Number of epochs", type=int, default=1024)
+    parser.add_argument("--epochs", help="Number of epochs", type=int, default=256)
     parser.add_argument("-n", "--num_samples", help="Samples for hyperparameter tuning.", type=int, default=128)
     # misc
+    parser.add_argument("--cpu", help="Number of CPU cores to use for training.", type=int, default=1)
+    parser.add_argument("--gpu", help="Number of GPUs to use for training.", type=int, default=0)
     parser.add_argument(
         "--int8", help="Quantize the trained model to INT8", action="store_true"
     )
@@ -44,7 +46,7 @@ def __main__():
         device = torch.device("cpu")
     print(f"Device: {device}")
     # initialize ray
-    ray.init(logging_level=logging.CRITICAL)
+    ray.init(num_cpus=arguments.cpu, num_gpus=arguments.gpu, logging_level=logging.ERROR)
     # create training, validation, and testing data sets
     data_train = np.load(f"{arguments.filename}_train_data.npy")
     labels_train = np.load(f"{arguments.filename}_train_labels.npy")
@@ -67,14 +69,14 @@ def __main__():
         torch.tensor(data_test, dtype=torch.float32, device=device),
         torch.tensor(labels_test, dtype=torch.float32, device=device),
     )
-    # Training and tuning hyperparameters
+    # training and tuning hyperparameters
     num_features = data_train.shape[1]
     num_epochs = arguments.epochs
     tuning_config = {
         "l0": tune.choice(
-            [i for i in range(int(num_features / 2), int(num_features * 10))]
+            [i for i in range(int(num_features / 2), int(num_features * 4), int(num_features / 2))]
         ),
-        "learning": tune.loguniform(1e-6, 1),
+        "learning": tune.loguniform(1e-6, 1e-1),
         "batch": tune.choice([2**i for i in range(1, 15)]),
         "epochs": tune.choice([num_epochs]),
     }
@@ -82,7 +84,7 @@ def __main__():
         metric="loss",
         mode="min",
         max_t=num_epochs,
-        grace_period=1,
+        grace_period=2,
         reduction_factor=2,
     )
     reporter = CLIReporter(
@@ -105,9 +107,10 @@ def __main__():
     print(f"Best trial config: {best_trial.config}")
     print(f"Best trial final validation loss: {best_trial.last_result['loss']}")
     print(f"Best trial final validation accuracy: {best_trial.last_result['accuracy']}")
-    # Test accuracy
-    test_dataloader = DataLoader(test_dataset, batch_size=best_trial.config["batch"])
+    # load best model
+    best_checkpoint = best_trial.checkpoint.to_air_checkpoint()
     model = GhostNetwork(num_features, l0=best_trial.config["l0"])
+    model.load_state_dict(best_checkpoint.to_dict()["net_state_dict"])
     model.to(device)
     print()
     print(model)
@@ -115,6 +118,8 @@ def __main__():
         f"Model parameters: {sum([x.reshape(-1).shape[0] for x in model.parameters()])}"
     )
     print()
+    # test accuracy
+    test_dataloader = DataLoader(test_dataset, batch_size=best_trial.config["batch"])
     accuracy, loss = testing_loop(model, test_dataloader, loss_function)
     print(f"Test Accuracy: {accuracy * 100.0:.2f}%")
     print(f"Test Loss: {loss:.6f}")

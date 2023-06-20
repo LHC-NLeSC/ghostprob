@@ -1,9 +1,11 @@
 import argparse
 from functools import partial
+import logging
 import numpy as np
 import torch
 from torch.utils.data import DataLoader
 from torch import nn
+import ray
 from ray import tune
 from ray.tune import CLIReporter
 from ray.tune.schedulers import ASHAScheduler
@@ -41,6 +43,8 @@ def __main__():
     else:
         device = torch.device("cpu")
     print(f"Device: {device}")
+    # initialize ray
+    ray.init(logging_level=logging.CRITICAL)
     # create training, validation, and testing data sets
     data_train = np.load(f"{arguments.filename}_train_data.npy")
     labels_train = np.load(f"{arguments.filename}_train_labels.npy")

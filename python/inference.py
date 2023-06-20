@@ -97,7 +97,7 @@ def __main__():
     # inference
     loss_function = nn.BCELoss()
     start_time = perf_counter()
-    accuracy, loss = testing_loop(model, test_dataloader, loss_function)
+    accuracy, loss = testing_loop(device, model, test_dataloader, loss_function)
     end_time = perf_counter()
     print(f"Accuracy: {accuracy * 100.0:.2f}%")
     print(f"Loss: {loss}")

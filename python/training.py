@@ -7,10 +7,9 @@ from torch.utils.data import DataLoader
 from torch import nn
 import ray
 from ray import tune
-from ray.tune import CLIReporter
 from ray.tune.schedulers import ASHAScheduler
 
-from utilities import GhostDataset, training_loop, testing_loop
+from utilities import GhostDataset, QuietReporter, training_loop, testing_loop
 from networks import GhostNetwork
 
 
@@ -60,6 +59,7 @@ def __main__():
     ray.init(
         num_cpus=arguments.cpu,
         num_gpus=arguments.gpu,
+        configure_logging=False,
         log_to_driver=False,
         logging_level=logging.ERROR,
     )
@@ -108,7 +108,7 @@ def __main__():
         grace_period=2,
         reduction_factor=2,
     )
-    reporter = CLIReporter(metric_columns=["loss", "accuracy", "training_iteration"])
+    reporter = QuietReporter(metric_columns=["loss", "accuracy", "training_iteration"])
     loss_function = nn.BCELoss()
     result = tune.run(
         partial(
@@ -125,6 +125,7 @@ def __main__():
         storage_path="./ray_logs",
         checkpoint_score_attr="loss",
         progress_reporter=reporter,
+        verbose=1,
     )
     best_trial = result.get_best_trial("loss", "min", "last")
     print(f"Best trial config: {best_trial.config}")

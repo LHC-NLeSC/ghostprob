@@ -1,5 +1,4 @@
 torch
-matplotlib
 onnx
 onnx2torch
 numpy

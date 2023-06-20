@@ -11,8 +11,6 @@ from ray.tune.schedulers import ASHAScheduler
 from utilities import GhostDataset, training_loop, testing_loop
 from networks import GhostNetwork
 
-NUM_SAMPLES = 64
-
 def command_line():
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -25,6 +23,7 @@ def command_line():
     parser.add_argument("--nocuda", help="Disable CUDA", action="store_true")
     # parameters
     parser.add_argument("--epochs", help="Number of epochs", type=int, default=1024)
+    parser.add_argument("-n", "--num_samples", help="Samples for hyperparameter tuning.", type=int, default=128)
     # misc
     parser.add_argument(
         "--int8", help="Quantize the trained model to INT8", action="store_true"
@@ -92,7 +91,7 @@ def __main__():
             training_dataset=training_dataset,
             validation_dataset=validation_dataset),
         config=tuning_config,
-        num_samples=NUM_SAMPLES,
+        num_samples=arguments.num_samples,
         scheduler=scheduler,
         storage_path="./ray_logs",
         checkpoint_score_attr="loss",

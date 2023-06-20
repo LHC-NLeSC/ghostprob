@@ -120,7 +120,7 @@ def __main__():
     print()
     # test accuracy
     test_dataloader = DataLoader(test_dataset, batch_size=best_trial.config["batch"])
-    accuracy, loss = testing_loop(model, test_dataloader, loss_function)
+    accuracy, loss = testing_loop(device, model, test_dataloader, loss_function)
     print(f"Test Accuracy: {accuracy * 100.0:.2f}%")
     print(f"Test Loss: {loss:.6f}")
     print()

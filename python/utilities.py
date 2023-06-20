@@ -53,6 +53,8 @@ def training_loop(config, num_features, device, loss_function, training_dataset,
     for epoch in range(start_epoch, num_epochs):
         model.train()
         for x, y in training_dataloader:
+            x = x.to(device)
+            y = y.to(device)
             optimizer.zero_grad()
             prediction = model(x)
             loss = loss_function(prediction, y)
@@ -71,12 +73,14 @@ def training_loop(config, num_features, device, loss_function, training_dataset,
         )
 
 
-def testing_loop(model, dataloader, loss_function):
+def testing_loop(device, model, dataloader, loss_function):
     accuracy = 0.0
     epoch_loss = 0.0
     model.eval()
     with torch.no_grad():
         for x, y in dataloader:
+            x = x.to(device)
+            y = y.to(device)
             prediction = model(x)
             loss = loss_function(prediction, y)
             epoch_loss = epoch_loss + loss.item()

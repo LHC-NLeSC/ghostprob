@@ -119,6 +119,7 @@ def __main__():
             training_dataset=training_dataset,
             validation_dataset=validation_dataset,
         ),
+        resources_per_trial={"cpu": arguments.cpu, "gpu": arguments.gpu},
         config=tuning_config,
         num_samples=arguments.num_samples,
         scheduler=scheduler,

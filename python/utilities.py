@@ -60,7 +60,7 @@ def training_loop(config, num_features, device, loss_function, training_dataset,
             loss = loss_function(prediction, y)
             loss.backward()
             optimizer.step()
-        accuracy, loss = testing_loop(model, validation_dataloader, loss_function)
+        accuracy, loss = testing_loop(device, model, validation_dataloader, loss_function)
         checkpoint_data = {
             "epoch": epoch,
             "net_state_dict": model.state_dict(),

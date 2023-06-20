@@ -13,6 +13,7 @@ from ray.tune.schedulers import ASHAScheduler
 from utilities import GhostDataset, training_loop, testing_loop
 from networks import GhostNetwork
 
+
 def command_line():
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -25,10 +26,20 @@ def command_line():
     parser.add_argument("--nocuda", help="Disable CUDA", action="store_true")
     # parameters
     parser.add_argument("--epochs", help="Number of epochs", type=int, default=256)
-    parser.add_argument("-n", "--num_samples", help="Samples for hyperparameter tuning.", type=int, default=128)
+    parser.add_argument(
+        "-n",
+        "--num_samples",
+        help="Samples for hyperparameter tuning.",
+        type=int,
+        default=128,
+    )
     # misc
-    parser.add_argument("--cpu", help="Number of CPU cores to use for training.", type=int, default=1)
-    parser.add_argument("--gpu", help="Number of GPUs to use for training.", type=int, default=0)
+    parser.add_argument(
+        "--cpu", help="Number of CPU cores to use for training.", type=int, default=1
+    )
+    parser.add_argument(
+        "--gpu", help="Number of GPUs to use for training.", type=int, default=0
+    )
     parser.add_argument(
         "--int8", help="Quantize the trained model to INT8", action="store_true"
     )
@@ -46,7 +57,12 @@ def __main__():
         device = torch.device("cpu")
     print(f"Device: {device}")
     # initialize ray
-    ray.init(num_cpus=arguments.cpu, num_gpus=arguments.gpu, logging_level=logging.ERROR)
+    ray.init(
+        num_cpus=arguments.cpu,
+        num_gpus=arguments.gpu,
+        log_to_driver=False,
+        logging_level=logging.ERROR,
+    )
     # create training, validation, and testing data sets
     data_train = np.load(f"{arguments.filename}_train_data.npy")
     labels_train = np.load(f"{arguments.filename}_train_labels.npy")
@@ -74,7 +90,12 @@ def __main__():
     num_epochs = arguments.epochs
     tuning_config = {
         "l0": tune.choice(
-            [i for i in range(int(num_features / 2), int(num_features * 4), int(num_features / 2))]
+            [
+                i
+                for i in range(
+                    int(num_features / 2), int(num_features * 4), int(num_features / 2)
+                )
+            ]
         ),
         "learning": tune.loguniform(1e-6, 1e-1),
         "batch": tune.choice([2**i for i in range(1, 15)]),
@@ -87,15 +108,17 @@ def __main__():
         grace_period=2,
         reduction_factor=2,
     )
-    reporter = CLIReporter(
-        metric_columns=["loss", "accuracy", "training_iteration"])
+    reporter = CLIReporter(metric_columns=["loss", "accuracy", "training_iteration"])
     loss_function = nn.BCELoss()
     result = tune.run(
-        partial(training_loop, num_features=num_features,
+        partial(
+            training_loop,
+            num_features=num_features,
             device=device,
             loss_function=loss_function,
             training_dataset=training_dataset,
-            validation_dataset=validation_dataset),
+            validation_dataset=validation_dataset,
+        ),
         config=tuning_config,
         num_samples=arguments.num_samples,
         scheduler=scheduler,

@@ -32,10 +32,13 @@ def shuffle_data(rng, data, labels):
     return data[permutation], labels[permutation]
 
 
-def training_loop(config, num_features, device, loss_function, training_dataset, validation_dataset
+def training_loop(
+    config, num_features, device, loss_function, training_dataset, validation_dataset
 ):
     training_dataloader = DataLoader(training_dataset, batch_size=int(config["batch"]))
-    validation_dataloader = DataLoader(validation_dataset, batch_size=int(config["batch"]))
+    validation_dataloader = DataLoader(
+        validation_dataset, batch_size=int(config["batch"])
+    )
     # model
     model = GhostNetwork(num_features, l0=config["l0"])
     optimizer = torch.optim.Adam(model.parameters(), lr=config["learning"])
@@ -60,7 +63,9 @@ def training_loop(config, num_features, device, loss_function, training_dataset,
             loss = loss_function(prediction, y)
             loss.backward()
             optimizer.step()
-        accuracy, loss = testing_loop(device, model, validation_dataloader, loss_function)
+        accuracy, loss = testing_loop(
+            device, model, validation_dataloader, loss_function
+        )
         checkpoint_data = {
             "epoch": epoch,
             "net_state_dict": model.state_dict(),

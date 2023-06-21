@@ -100,6 +100,7 @@ def __main__():
         "learning": tune.loguniform(1e-6, 1e-1),
         "batch": tune.choice([2**i for i in range(1, 15)]),
         "epochs": tune.choice([num_epochs]),
+        "optimizer": tune.choice([0, 1])
     }
     scheduler = ASHAScheduler(
         metric="loss",

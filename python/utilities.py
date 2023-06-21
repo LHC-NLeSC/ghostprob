@@ -47,7 +47,13 @@ def training_loop(
     )
     # model
     model = GhostNetwork(num_features, l0=config["l0"])
-    optimizer = torch.optim.Adam(model.parameters(), lr=config["learning"])
+    if config["optimizer"] == 0:
+        if "cuda" in device.type:
+            optimizer = torch.optim.Adam(model.parameters(), lr=config["learning"], fused=True)
+        else:
+            optimizer = torch.optim.Adam(model.parameters(), lr=config["learning"])
+    elif config["optimizer"] == 1:
+        optimizer = torch.optim.SGD(model.parameters(), lr=config["learning"])
     model.to(device)
     # checkpointing
     checkpoint = session.get_checkpoint()

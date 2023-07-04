@@ -101,7 +101,18 @@ def __main__():
         "batch": tune.choice([2**i for i in range(1, 15)]),
         "epochs": tune.choice([num_epochs]),
         "optimizer": tune.choice([0, 1]),
-        "activation": tune.choice([nn.ReLU, nn.Tanh, nn.Sigmoid, nn.LeakyReLU])
+        "activation": tune.choice(
+            [
+                nn.ReLU,
+                nn.Tanh,
+                nn.Sigmoid,
+                nn.LeakyReLU,
+                nn.ELU,
+                nn.LogSigmoid,
+                nn.Softmax,
+                nn.Softmin,
+            ]
+        ),
     }
     scheduler = ASHAScheduler(
         metric="loss",
@@ -136,7 +147,11 @@ def __main__():
     print(f"Best trial final validation accuracy: {best_trial.last_result['accuracy']}")
     # load best model
     best_checkpoint = best_trial.checkpoint.to_air_checkpoint()
-    model = GhostNetwork(num_features, l0=best_trial.config["l0"], activation=best_trial.config["activation"])
+    model = GhostNetwork(
+        num_features,
+        l0=best_trial.config["l0"],
+        activation=best_trial.config["activation"],
+    )
     model.load_state_dict(best_checkpoint.to_dict()["net_state_dict"])
     model.to(device)
     print()

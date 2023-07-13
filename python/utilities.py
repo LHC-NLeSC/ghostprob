@@ -5,7 +5,7 @@ from torch.utils.data import Dataset, DataLoader
 from ray.air import Checkpoint, session
 from ray.tune import CLIReporter
 
-from networks import GhostNetwork
+from networks import GhostNetwork, GhostNetworkExperiment
 
 
 class GhostDataset(Dataset):
@@ -46,7 +46,13 @@ def training_loop(
         validation_dataset, batch_size=int(config["batch"])
     )
     # model
-    model = GhostNetwork(num_features, l0=config["l0"], activation=config["activation"])
+    model = GhostNetworkExperiment(
+        num_features,
+        l0=config["l0"],
+        l1=config["l1"],
+        activation=config["activation"],
+        normalization=config["normalization"],
+    )
     if config["optimizer"] == 0:
         optimizer = torch.optim.Adam(model.parameters(), lr=config["learning"])
     elif config["optimizer"] == 1:

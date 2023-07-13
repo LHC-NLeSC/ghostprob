@@ -10,7 +10,7 @@ from ray import tune
 from ray.tune.schedulers import ASHAScheduler
 
 from utilities import GhostDataset, QuietReporter, training_loop, testing_loop
-from networks import GhostNetwork
+from networks import GhostNetwork, GhostNetworkExperiment
 
 
 def command_line():
@@ -90,17 +90,16 @@ def __main__():
     num_epochs = arguments.epochs
     tuning_config = {
         "l0": tune.choice(
-            [
-                i
-                for i in range(
-                    int(num_features / 2), int(num_features * 4), int(num_features / 2)
-                )
-            ]
+            [i for i in range(int(num_features / 3), int(num_features * 3), 4)]
+        ),
+        "l1": tune.choice(
+            [i for i in range(int(num_features / 3), int(num_features * 3), 4)]
         ),
         "learning": tune.loguniform(1e-6, 1e-1),
         "batch": tune.choice([2**i for i in range(1, 15)]),
         "epochs": tune.choice([num_epochs]),
         "optimizer": tune.choice([0, 1]),
+        "drate": tune.choice([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]),
         "activation": tune.choice(
             [
                 nn.ReLU,
@@ -111,6 +110,15 @@ def __main__():
                 nn.LogSigmoid,
                 nn.Softmax,
                 nn.Softmin,
+            ]
+        ),
+        "normalization": tune.choice(
+            [
+                nn.BatchNorm1d,
+                nn.LazyBatchNorm1d,
+                nn.SyncBatchNorm,
+                nn.InstanceNorm1d,
+                nn.LayerNorm,
             ]
         ),
     }
@@ -147,10 +155,13 @@ def __main__():
     print(f"Best trial final validation accuracy: {best_trial.last_result['accuracy']}")
     # load best model
     best_checkpoint = best_trial.checkpoint.to_air_checkpoint()
-    model = GhostNetwork(
+    model = GhostNetworkExperiment(
         num_features,
         l0=best_trial.config["l0"],
+        l1=best_trial.config["l1"],
+        drate=best_trial.config["drate"],
         activation=best_trial.config["activation"],
+        normalization=best_trial.config["normalization"],
     )
     model.load_state_dict(best_checkpoint.to_dict()["net_state_dict"])
     model.to(device)
@@ -177,7 +188,9 @@ def __main__():
     if arguments.int8:
         print("INT8 quantization")
         model.qconfig = torch.quantization.get_default_qat_qconfig("fbgemm")
-        model_fused = torch.quantization.fuse_modules(model, [["layer0", "relu"]])
+        model_fused = torch.quantization.fuse_modules(
+            model, [["layer0", "activation"], ["layer1", "activation"]]
+        )
         model_prepared = torch.quantization.prepare_qat(model_fused.train())
         for epoch in range(0, num_epochs):
             training_loop()

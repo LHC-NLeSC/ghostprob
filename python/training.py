@@ -33,6 +33,7 @@ def command_line():
         default=128,
     )
     # misc
+    parser.add_argument("--threshold", help="Ghost threshold.", type=float, default=0.5)
     parser.add_argument(
         "--cpu", help="Number of CPU cores to use for training.", type=int, default=1
     )
@@ -139,6 +140,7 @@ def __main__():
             loss_function=loss_function,
             training_dataset=training_dataset,
             validation_dataset=validation_dataset,
+            threshold=arguments.threshold,
         ),
         resources_per_trial={"cpu": arguments.cpu, "gpu": arguments.gpu},
         config=tuning_config,
@@ -173,7 +175,9 @@ def __main__():
     print()
     # test accuracy
     test_dataloader = DataLoader(test_dataset, batch_size=best_trial.config["batch"])
-    accuracy, loss = testing_loop(device, model, test_dataloader, loss_function)
+    accuracy, loss = testing_loop(
+        device, model, test_dataloader, loss_function, arguments.threshold
+    )
     print(f"Test Accuracy: {accuracy * 100.0:.2f}%")
     print(f"Test Loss: {loss:.6f}")
     print()

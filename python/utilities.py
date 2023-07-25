@@ -39,7 +39,13 @@ def shuffle_data(rng, data, labels):
 
 
 def training_loop(
-    config, num_features, device, loss_function, training_dataset, validation_dataset
+    config,
+    num_features,
+    device,
+    loss_function,
+    training_dataset,
+    validation_dataset,
+    threshold=0.5,
 ):
     training_dataloader = DataLoader(training_dataset, batch_size=int(config["batch"]))
     validation_dataloader = DataLoader(
@@ -79,7 +85,7 @@ def training_loop(
             loss.backward()
             optimizer.step()
         accuracy, loss = testing_loop(
-            device, model, validation_dataloader, loss_function
+            device, model, validation_dataloader, loss_function, threshold
         )
         checkpoint_data = {
             "epoch": epoch,
@@ -93,7 +99,7 @@ def training_loop(
         )
 
 
-def testing_loop(device, model, dataloader, loss_function):
+def testing_loop(device, model, dataloader, loss_function, threshold=0.5):
     accuracy = 0.0
     epoch_loss = 0.0
     model.eval()
@@ -104,7 +110,7 @@ def testing_loop(device, model, dataloader, loss_function):
             prediction = model(x)
             loss = loss_function(prediction, y)
             epoch_loss = epoch_loss + loss.item()
-            accuracy = accuracy + (prediction.round() == y).float().mean()
+            accuracy = accuracy + ((prediction > threshold).float() == y).float().mean()
     epoch_loss = epoch_loss / len(dataloader)
     accuracy = accuracy / len(dataloader)
     return accuracy, epoch_loss

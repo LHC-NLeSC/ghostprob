@@ -3,7 +3,9 @@ from torch import nn
 
 
 class GhostNetwork(nn.Module):
-    def __init__(self, num_features, l0=32, activation=nn.ReLU, normalization=nn.BatchNorm1d):
+    def __init__(
+        self, num_features, l0=32, activation=nn.ReLU, normalization=nn.BatchNorm1d
+    ):
         super(GhostNetwork, self).__init__()
         self.quant = torch.quantization.QuantStub()
         self.norm = normalization(num_features)

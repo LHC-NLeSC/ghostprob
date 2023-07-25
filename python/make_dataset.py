@@ -46,7 +46,7 @@ def __main__():
     print(
         f"Number of ghosts ({len(data_ghost)}) and real tracks ({len(data_real)}) in data set"
     )
-    # select the same number of other particles as there are electrons
+    # select the same number of real tracks as there are ghosts
     rng = np.random.default_rng()
     rng.shuffle(data_real)
     max_train = int(0.6 * len(data_ghost))

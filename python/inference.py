@@ -1,4 +1,5 @@
 import argparse
+import pickle
 from time import perf_counter
 import numpy as np
 import torch
@@ -7,7 +8,7 @@ from torch.utils.data import DataLoader
 import onnx2torch
 
 from utilities import load_data, shuffle_data, GhostDataset, testing_loop, remove_nans
-from networks import GhostNetwork
+from networks import GhostNetwork, GhostNetworkExperiment
 from data import label, training_columns
 
 
@@ -23,7 +24,11 @@ def command_line():
         type=str,
         required=True,
     )
-    parser.add_argument("--batch", help="Batch size", type=int, default=512)
+    parser.add_argument(
+        "--config",
+        help="Name of the file containing the model configuration.",
+        type=str,
+    )
     parser.add_argument(
         "--int8", help="Quantize the trained model to INT8", action="store_true"
     )
@@ -36,6 +41,7 @@ def __main__():
         device = torch.device("cuda")
     else:
         device = torch.device("cpu")
+    print(f"Device: {device}")
     if ".root" in arguments.filename:
         dataframe, columns = load_data(arguments.filename)
         print(f"Columns in the table: {len(dataframe)}")
@@ -63,7 +69,7 @@ def __main__():
         rng = np.random.default_rng()
         rng.shuffle(data_real)
         data_real = data_real[: len(data_ghost)]
-        # create training and testing data set
+        # create data set
         data = np.vstack((data_ghost, data_real))
         labels_ghost = np.ones((len(data_ghost), 1), dtype=int)
         labels_real = np.zeros((len(data_real), 1), dtype=int)
@@ -74,34 +80,48 @@ def __main__():
         labels = np.load(f"{arguments.filename}_test_labels.npy")
         print(f"Test set size: {len(data)}")
     test_dataset = GhostDataset(
-        torch.tensor(datadtype=torch.float32, device=device),
-        torch.tensor(labelsdtype=torch.float32, device=device),
+        torch.tensor(data, dtype=torch.float32, device=device),
+        torch.tensor(labels, dtype=torch.float32, device=device),
     )
-    test_dataloader = DataLoader(test_dataset, batch_size=arguments.batch, shuffle=True)
     # read model
     num_features = data.shape[1]
+    with open(arguments.config, "rb") as file:
+        model_config = pickle.load(file)
     if arguments.int8:
         model = torch.load(arguments.model)
     else:
         if "onnx" in arguments.model:
             model = onnx2torch.convert(arguments.model)
         else:
-            model = GhostNetwork(num_features=num_features)
+            model = GhostNetworkExperiment(
+                num_features=num_features,
+                l0=model_config["l0"],
+                l1=model_config["l1"],
+                drate=model_config["drate"],
+                activation=model_config["activation"],
+                normalization=model_config["normalization"],
+            )
             weights = torch.load(arguments.model)
             model.load_state_dict(weights)
-    print(f"Device: {device}")
     model.to(device)
     print()
     print(model)
     print()
+    test_dataloader = DataLoader(
+        test_dataset, batch_size=model_config["batch"], shuffle=True
+    )
     # inference
-    loss_function = nn.BCELoss()
-    start_time = perf_counter()
-    accuracy, loss = testing_loop(device, model, test_dataloader, loss_function)
-    end_time = perf_counter()
-    print(f"Accuracy: {accuracy * 100.0:.2f}%")
-    print(f"Loss: {loss}")
-    print(f"Inference time: {end_time - start_time:.2f} seconds")
+    for threshold in [0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95]:
+        loss_function = nn.BCELoss()
+        start_time = perf_counter()
+        accuracy, _ = testing_loop(
+            device, model, test_dataloader, loss_function, threshold
+        )
+        end_time = perf_counter()
+        print(f"Threshold: {threshold}")
+        print(f"Accuracy: {accuracy * 100.0:.2f}%")
+        print(f"Inference time: {end_time - start_time:.2f} seconds")
+        print()
 
 
 if __name__ == "__main__":

@@ -1,6 +1,7 @@
 import argparse
 from functools import partial
 import logging
+import pickle
 import numpy as np
 import torch
 from torch.utils.data import DataLoader
@@ -185,6 +186,8 @@ def __main__():
     if arguments.save:
         print("Saving model to disk")
         torch.save(model.state_dict(), "ghost_model.pth")
+        with open("ghost_model_config.pkl", "wb") as file:
+            pickle.dump(best_trial.config, file)
         print("Saving model to ONNX format")
         dummy_input = torch.randn(1, num_features)
         torch.onnx.export(model, dummy_input, "ghost_model.onnx", export_params=True)

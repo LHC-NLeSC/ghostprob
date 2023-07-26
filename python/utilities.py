@@ -56,6 +56,7 @@ def training_loop(
         num_features,
         l0=config["l0"],
         l1=config["l1"],
+        l2=config["l2"],
         activation=config["activation"],
         normalization=config["normalization"],
     )

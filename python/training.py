@@ -97,6 +97,9 @@ def __main__():
         "l1": tune.choice(
             [i for i in range(int(num_features / 3), int(num_features * 3), 4)]
         ),
+        "l2": tune.choice(
+            [i for i in range(int(num_features / 3), int(num_features * 3), 4)]
+        ),
         "learning": tune.loguniform(1e-6, 1e-1),
         "batch": tune.choice([2**i for i in range(1, 15)]),
         "epochs": tune.choice([num_epochs]),
@@ -162,6 +165,7 @@ def __main__():
         num_features,
         l0=best_trial.config["l0"],
         l1=best_trial.config["l1"],
+        l2=best_trial.config["l2"],
         drate=best_trial.config["drate"],
         activation=best_trial.config["activation"],
         normalization=best_trial.config["normalization"],

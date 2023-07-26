@@ -32,6 +32,7 @@ class GhostNetworkExperiment(nn.Module):
         num_features,
         l0=32,
         l1=16,
+        l2=32,
         drate=0.5,
         activation=nn.ReLU,
         normalization=nn.BatchNorm1d,
@@ -41,9 +42,10 @@ class GhostNetworkExperiment(nn.Module):
         self.norm = normalization(num_features)
         self.layer0 = nn.Linear(num_features, l0)
         self.layer1 = nn.Linear(l0, l1)
+        self.layer2 = nn.Linear(l1, l2)
         self.drop = nn.Dropout(drate)
         self.activation = activation()
-        self.output = nn.Linear(l1, 1)
+        self.output = nn.Linear(l2, 1)
         self.sigmoid = nn.Sigmoid()
         self.dequant = torch.quantization.DeQuantStub()
 
@@ -54,6 +56,8 @@ class GhostNetworkExperiment(nn.Module):
         x = self.activation(x)
         x = self.drop(x)
         x = self.layer1(x)
+        x = self.activation(x)
+        x = self.layer2(x)
         x = self.activation(x)
         x = self.output(x)
         x = self.sigmoid(x)

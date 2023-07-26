@@ -97,6 +97,7 @@ def __main__():
                 num_features=num_features,
                 l0=model_config["l0"],
                 l1=model_config["l1"],
+                l2=model_config["l2"],
                 drate=model_config["drate"],
                 activation=model_config["activation"],
                 normalization=model_config["normalization"],

@@ -52,12 +52,9 @@ def training_loop(
         validation_dataset, batch_size=int(config["batch"])
     )
     # model
-    model = GhostNetworkExperiment(
+    model = GhostNetwork(
         num_features,
         l0=config["l0"],
-        l1=config["l1"],
-        l2=config["l2"],
-        drate=config["drate"],
         activation=config["activation"],
         normalization=config["normalization"],
     )

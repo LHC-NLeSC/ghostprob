@@ -94,17 +94,10 @@ def __main__():
         "l0": tune.choice(
             [i for i in range(int(num_features / 3), int(num_features * 3), 4)]
         ),
-        "l1": tune.choice(
-            [i for i in range(int(num_features / 3), int(num_features * 3), 4)]
-        ),
-        "l2": tune.choice(
-            [i for i in range(int(num_features / 3), int(num_features * 3), 4)]
-        ),
         "learning": tune.loguniform(1e-6, 1e-1),
         "batch": tune.choice([2**i for i in range(1, 15)]),
         "epochs": tune.choice([num_epochs]),
         "optimizer": tune.choice([0, 1]),
-        "drate": tune.choice([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]),
         "activation": tune.choice(
             [
                 nn.ReLU,
@@ -161,12 +154,9 @@ def __main__():
     print(f"Best trial final validation accuracy: {best_trial.last_result['accuracy']}")
     # load best model
     best_checkpoint = best_trial.checkpoint.to_air_checkpoint()
-    model = GhostNetworkExperiment(
+    model = GhostNetwork(
         num_features,
         l0=best_trial.config["l0"],
-        l1=best_trial.config["l1"],
-        l2=best_trial.config["l2"],
-        drate=best_trial.config["drate"],
         activation=best_trial.config["activation"],
         normalization=best_trial.config["normalization"],
     )

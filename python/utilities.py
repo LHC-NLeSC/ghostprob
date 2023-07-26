@@ -57,6 +57,7 @@ def training_loop(
         l0=config["l0"],
         l1=config["l1"],
         l2=config["l2"],
+        drate=config["drate"],
         activation=config["activation"],
         normalization=config["normalization"],
     )

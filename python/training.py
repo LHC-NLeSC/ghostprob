@@ -184,14 +184,14 @@ def __main__():
             pickle.dump(best_trial.config, file)
         print("Saving model to ONNX format")
         dummy_input = torch.randn(1, num_features)
+        dummy_input.to("cpu")
+        model.to("cpu")
         torch.onnx.export(model, dummy_input, "ghost_model.onnx", export_params=True)
     # INT8 quantization
     if arguments.int8:
         print("INT8 quantization")
         model.qconfig = torch.quantization.get_default_qat_qconfig("fbgemm")
-        model_fused = torch.quantization.fuse_modules(
-            model, [["layer0", "activation"], ["layer1", "activation"]]
-        )
+        model_fused = torch.quantization.fuse_modules(model, [["layer0", "activation"]])
         model_prepared = torch.quantization.prepare_qat(model_fused.train())
         for epoch in range(0, num_epochs):
             training_loop()
@@ -206,6 +206,8 @@ def __main__():
             torch.save(model_int8, "ghost_model_int8.pth")
             print("Saving INT8 model to ONNX format")
             dummy_input = torch.randn(1, num_features)
+            dummy_input.to("cpu")
+            model_int8.to("cpu")
             torch.onnx.export(
                 model_int8, dummy_input, "ghost_model_int8.onnx", export_params=True
             )

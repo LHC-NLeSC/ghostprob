@@ -10,7 +10,14 @@ import ray
 from ray import tune
 from ray.tune.schedulers import ASHAScheduler
 
-from utilities import GhostDataset, QuietReporter, training_loop, testing_loop
+from utilities import (
+    GhostDataset,
+    QuietReporter,
+    training_loop,
+    inner_training_loop,
+    testing_loop,
+    select_optimizer,
+)
 from networks import GhostNetwork, GhostNetworkExperiment
 
 
@@ -191,10 +198,17 @@ def __main__():
     if arguments.int8:
         print("INT8 quantization")
         model.qconfig = torch.quantization.get_default_qat_qconfig("fbgemm")
-        model_fused = torch.quantization.fuse_modules(model, [["layer0", "activation"]])
-        model_prepared = torch.quantization.prepare_qat(model_fused.train())
+        model_prepared = torch.quantization.prepare_qat(model.train())
         for epoch in range(0, num_epochs):
-            training_loop()
+            inner_training_loop(
+                model_prepared,
+                DataLoader(
+                    training_dataset, batch_size=int(best_trial.config["batch"])
+                ),
+                "cpu",
+                select_optimizer(best_trial.config, model),
+                loss_function,
+            )
         model_prepared.eval()
         model_int8 = torch.quantization.convert(model_prepared)
         print()

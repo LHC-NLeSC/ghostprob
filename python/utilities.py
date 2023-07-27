@@ -38,6 +38,14 @@ def shuffle_data(rng, data, labels):
     return data[permutation], labels[permutation]
 
 
+def select_optimizer(config, model):
+    if config["optimizer"] == 0:
+        optimizer = torch.optim.Adam(model.parameters(), lr=config["learning"])
+    elif config["optimizer"] == 1:
+        optimizer = torch.optim.SGD(model.parameters(), lr=config["learning"])
+    return optimizer
+
+
 def training_loop(
     config,
     num_features,
@@ -58,10 +66,7 @@ def training_loop(
         activation=config["activation"],
         normalization=config["normalization"],
     )
-    if config["optimizer"] == 0:
-        optimizer = torch.optim.Adam(model.parameters(), lr=config["learning"])
-    elif config["optimizer"] == 1:
-        optimizer = torch.optim.SGD(model.parameters(), lr=config["learning"])
+    optimizer = select_optimizer(config, model)
     model.to(device)
     # checkpointing
     checkpoint = session.get_checkpoint()
@@ -74,15 +79,9 @@ def training_loop(
         start_epoch = 0
     num_epochs = config["epochs"]
     for epoch in range(start_epoch, num_epochs):
-        model.train()
-        for x, y in training_dataloader:
-            x = x.to(device)
-            y = y.to(device)
-            optimizer.zero_grad()
-            prediction = model(x)
-            loss = loss_function(prediction, y)
-            loss.backward()
-            optimizer.step()
+        inner_training_loop(
+            model, training_dataloader, device, optimizer, loss_function
+        )
         accuracy, loss = testing_loop(
             device, model, validation_dataloader, loss_function, threshold
         )
@@ -96,6 +95,18 @@ def training_loop(
             {"loss": loss, "accuracy": accuracy},
             checkpoint=checkpoint,
         )
+
+
+def inner_training_loop(model, dataloader, device, optimizer, loss_function):
+    model.train()
+    for x, y in dataloader:
+        x = x.to(device)
+        y = y.to(device)
+        optimizer.zero_grad()
+        prediction = model(x)
+        loss = loss_function(prediction, y)
+        loss.backward()
+        optimizer.step()
 
 
 def testing_loop(device, model, dataloader, loss_function, threshold=0.5):

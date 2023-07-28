@@ -126,6 +126,32 @@ def testing_loop(device, model, dataloader, loss_function, threshold=0.5):
     return accuracy, epoch_loss
 
 
+def testing_accuracy(device, model, dataloader, threshold):
+    model.eval()
+    # TP, TN, FP, FN
+    accuracy = [0, 0, 0, 0]
+    with torch.no_grad():
+        for x, y in dataloader:
+            x = x.to(device)
+            y = y.to(device)
+            prediction = model(x)
+            prediction = (prediction > threshold).int()
+            for i in range(0, len(prediction)):
+                # True Positive
+                if prediction[i] == 1 and y.int()[i] == 1:
+                    accuracy[0] += 1
+                # True Negative
+                elif prediction[i] == 0 and y.int()[i] == 0:
+                    accuracy[1] += 1
+                # False Positive
+                elif prediction[i] == 1 and y.int()[i] == 0:
+                    accuracy[2] += 1
+                # False Negative
+                elif prediction[i] == 0 and y.int()[i] == 1:
+                    accuracy[3] += 1
+    return accuracy
+
+
 def remove_nans(data, labels):
     corrected_columns = 0
     for _, column in enumerate(data):

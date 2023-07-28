@@ -6,10 +6,39 @@ import torch
 from torch import nn
 from torch.utils.data import DataLoader
 import onnx2torch
+import matplotlib.pyplot as plt
 
-from utilities import load_data, shuffle_data, GhostDataset, testing_loop, remove_nans
+from utilities import (
+    load_data,
+    shuffle_data,
+    GhostDataset,
+    testing_loop,
+    remove_nans,
+    testing_accuracy,
+)
 from networks import GhostNetwork, GhostNetworkExperiment
 from data import label, training_columns
+
+thresholds = [
+    0.1,
+    0.15,
+    0.2,
+    0.25,
+    0.3,
+    0.35,
+    0.4,
+    0.45,
+    0.5,
+    0.55,
+    0.6,
+    0.65,
+    0.7,
+    0.75,
+    0.8,
+    0.85,
+    0.9,
+    0.95,
+]
 
 
 def command_line():
@@ -28,6 +57,7 @@ def command_line():
         "--config",
         help="Name of the file containing the model configuration.",
         type=str,
+        required=True,
     )
     parser.add_argument(
         "--int8", help="Quantize the trained model to INT8", action="store_true"
@@ -108,28 +138,9 @@ def __main__():
     test_dataloader = DataLoader(
         test_dataset, batch_size=model_config["batch"], shuffle=True
     )
-    # inference
-    for threshold in [
-        0.1,
-        0.15,
-        0.2,
-        0.25,
-        0.3,
-        0.35,
-        0.4,
-        0.45,
-        0.5,
-        0.55,
-        0.6,
-        0.65,
-        0.7,
-        0.75,
-        0.8,
-        0.85,
-        0.9,
-        0.95,
-    ]:
-        loss_function = nn.BCELoss()
+    loss_function = nn.BCELoss()
+    # Accuracy test (CLI)
+    for threshold in thresholds:
         start_time = perf_counter()
         accuracy, _ = testing_loop(
             device, model, test_dataloader, loss_function, threshold
@@ -139,6 +150,44 @@ def __main__():
         print(f"Accuracy: {accuracy * 100.0:.2f}%")
         print(f"Inference time: {end_time - start_time:.2f} seconds")
         print()
+    # Plot accuracy components
+    tp = list()
+    tn = list()
+    fp = list()
+    fn = list()
+    for threshold in thresholds:
+        accuracy = testing_accuracy(device, model, test_dataloader, threshold)
+        tp.append(accuracy[0])
+        tn.append(accuracy[1])
+        fp.append(accuracy[2])
+        fn.append(accuracy[3])
+    plt.plot(thresholds, tp, label="True Positive")
+    plt.plot(thresholds, tn, label="True Negative")
+    plt.plot(thresholds, fp, label="False Positive")
+    plt.plot(thresholds, fn, label="False Negative")
+    plt.xlabel("Threshold")
+    plt.xticks(thresholds)
+    plt.legend()
+    plt.show()
+    sensitivity = list()
+    specificity = list()
+    ppv = list()
+    npv = list()
+    ba = list()
+    for i in range(0, len(thresholds)):
+        sensitivity.append(tp[i] / (tp[i] + fn[i]))
+        specificity.append(tn[i] / (tn[i] + fp[i]))
+        ppv.append(tp[i] / (tp[i] + fp[i]))
+        npv.append(tn[i] / (tn[i] + fn[i]))
+        ba.append((sensitivity[i] + specificity[i]) / 2)
+    plt.plot(thresholds, sensitivity, label="Sensitivity")
+    plt.plot(thresholds, specificity, label="Specificity")
+    plt.plot(thresholds, ppv, label="Positive Predictive Value")
+    plt.plot(thresholds, npv, label="Negative Predictive Value")
+    plt.plot(thresholds, ba, label="Balanced Accuracy")
+    plt.xticks(thresholds)
+    plt.legend()
+    plt.show()
 
 
 if __name__ == "__main__":

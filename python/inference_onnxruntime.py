@@ -1,10 +1,9 @@
 import argparse
-import pickle
 import numpy as np
 import torch
 import onnxruntime as ort
 
-from utilities import load_data, remove_nans, shuffle_data, GhostDataset, DataLoader
+from utilities import load_data, remove_nans, shuffle_data, GhostDataset
 from data import label, training_columns
 
 
@@ -21,7 +20,6 @@ def command_line():
     )
     parser.add_argument("--threshold", help="Ghost threshold.", type=float, default=0.5)
     return parser.parse_args()
-
 
 
 def __main__():
@@ -76,7 +74,7 @@ def __main__():
     # TP, TN, FP, FN
     accuracy = [0, 0, 0, 0]
     for i in range(len(test_dataset)):
-        x, y  = test_dataset[i]
+        x, y = test_dataset[i]
         prediction = ort_session.run([output_name], {input_name: [x.numpy()]})[0][0][0]
         prediction = int((prediction > arguments.threshold))
         if prediction == 1 and y.int() == 1:
@@ -96,6 +94,7 @@ def __main__():
     print(f"False negative: {accuracy[3]}")
     print()
     print(f"Accuracy: {((accuracy[0] + accuracy[1])/(np.sum(accuracy)) * 100):.2f}%")
+
 
 if __name__ == "__main__":
     __main__()

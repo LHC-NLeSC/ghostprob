@@ -94,6 +94,8 @@ def __main__():
     print(f"True negative: {accuracy[1]}")
     print(f"False positive: {accuracy[2]}")
     print(f"False negative: {accuracy[3]}")
+    print()
+    print(f"Accuracy: {((accuracy[0] + accuracy[1])/(np.sum(accuracy)) * 100):.2f}%")
 
 if __name__ == "__main__":
     __main__()

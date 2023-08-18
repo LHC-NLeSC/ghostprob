@@ -49,7 +49,7 @@ def command_line():
         "--gpu", help="Number of GPUs to use for training.", type=int, default=0
     )
     parser.add_argument(
-        "--int8", help="Quantize the trained model to INT8", action="store_true"
+        "--int8", help="Quantize the trained model to INT8.", action="store_true"
     )
     parser.add_argument(
         "--save", help="Save the trained model to disk", action="store_true"
@@ -199,7 +199,7 @@ def __main__():
         print("INT8 quantization")
         model.qconfig = torch.quantization.get_default_qat_qconfig("fbgemm")
         model_prepared = torch.quantization.prepare_qat(model.train())
-        for epoch in range(0, num_epochs):
+        for _ in range(0, num_epochs):
             inner_training_loop(
                 model_prepared,
                 DataLoader(

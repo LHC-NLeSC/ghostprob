@@ -59,9 +59,7 @@ def command_line():
         type=str,
         required=True,
     )
-    parser.add_argument(
-        "--int8", help="Quantize the trained model to INT8", action="store_true"
-    )
+    parser.add_argument("--int8", help="INT8 quantization.", action="store_true")
     return parser.parse_args()
 
 
@@ -88,27 +86,18 @@ def __main__():
         data = [dataframe[column] for column in training_columns]
         # Remove NaNs
         data, labels = remove_nans(data, labels)
-        # split into ghost and real tracks
+        # Shuffle
         data = np.hstack([data[i].reshape(len(data[0]), 1) for i in range(len(data))])
-        data_ghost = data[labels == 1]
-        data_real = data[labels == 0]
-        print(
-            f"Number of ghost ({len(data_ghost)}) and real tracks ({len(data_real)}) in data set"
-        )
-        # select the same number of other real tracks as there are ghosts
         rng = np.random.default_rng()
-        rng.shuffle(data_real)
-        data_real = data_real[: len(data_ghost)]
-        # create data set
-        data = np.vstack((data_ghost, data_real))
-        labels_ghost = np.ones((len(data_ghost), 1), dtype=int)
-        labels_real = np.zeros((len(data_real), 1), dtype=int)
-        labels = np.vstack((labels_ghost, labels_real))
         data, labels = shuffle_data(rng, data, labels)
     else:
         data = np.load(f"{arguments.filename}_test_data.npy")
         labels = np.load(f"{arguments.filename}_test_labels.npy")
         print(f"Test set size: {len(data)}")
+    tracks = len(data)
+    values, counts = np.unique(labels, return_counts=True)
+    p_ghosts = dict(zip(values, counts))[1] / tracks
+    p_real = dict(zip(values, counts))[0] / tracks
     test_dataset = GhostDataset(
         torch.tensor(data, dtype=torch.float32, device=device),
         torch.tensor(labels, dtype=torch.float32, device=device),
@@ -140,16 +129,25 @@ def __main__():
     )
     loss_function = nn.BCELoss()
     # Accuracy test (CLI)
+    accuracies = list()
     for threshold in thresholds:
         start_time = perf_counter()
         accuracy, _ = testing_loop(
             device, model, test_dataloader, loss_function, threshold
         )
         end_time = perf_counter()
+        accuracies.append(accuracy)
         print(f"Threshold: {threshold}")
         print(f"Accuracy: {accuracy * 100.0:.2f}%")
         print(f"Inference time: {end_time - start_time:.2f} seconds")
         print()
+    # Plot accuracy over threshold
+    plt.plot(thresholds, accuracies, label="Accuracy")
+    plt.xlabel("Threshold")
+    plt.xticks(thresholds)
+    plt.ylim(0, 1)
+    plt.legend()
+    plt.show()
     # Plot accuracy components
     tp = list()
     tn = list()
@@ -161,31 +159,45 @@ def __main__():
         tn.append(accuracy[1])
         fp.append(accuracy[2])
         fn.append(accuracy[3])
-    plt.plot(thresholds, tp, label="True Positive")
-    plt.plot(thresholds, tn, label="True Negative")
-    plt.plot(thresholds, fp, label="False Positive")
-    plt.plot(thresholds, fn, label="False Negative")
-    plt.xlabel("Threshold")
+    g_tp = list()
+    g_tn = list()
+    g_fp = list()
+    g_fn = list()
+    sensitivity = list()
+    specificity = list()
+    fnr = list()
+    fpr = list()
+    for i in range(0, len(thresholds)):
+        g_tp.append(tp[i] / tracks)
+        g_tn.append(tn[i] / tracks)
+        g_fp.append(fp[i] / tracks)
+        g_fn.append(fn[i] / tracks)
+        sensitivity.append(tp[i] / (tp[i] + fn[i]))
+        specificity.append(tn[i] / (tn[i] + fp[i]))
+        fnr.append(fn[i] / (fn[i] + tp[1]))
+        fpr.append(fp[i] / (fp[i] + tn[1]))
+    plt.plot(thresholds, [p_ghosts] * len(thresholds), label="Positives")
+    plt.plot(thresholds, [p_real] * len(thresholds), label="Negatives")
+    plt.plot(thresholds, g_tp, label="NN - True Positives")
+    plt.plot(thresholds, g_tn, label="NN - True Negatives")
+    plt.plot(thresholds, g_fp, label="NN - False Positives")
+    plt.plot(thresholds, g_fn, label="NN - False Negatives")
     plt.xticks(thresholds)
     plt.legend()
     plt.show()
-    sensitivity = list()
-    specificity = list()
-    ppv = list()
-    npv = list()
-    ba = list()
-    for i in range(0, len(thresholds)):
-        sensitivity.append(tp[i] / (tp[i] + fn[i]))
-        specificity.append(tn[i] / (tn[i] + fp[i]))
-        ppv.append(tp[i] / (tp[i] + fp[i]))
-        npv.append(tn[i] / (tn[i] + fn[i]))
-        ba.append((sensitivity[i] + specificity[i]) / 2)
     plt.plot(thresholds, sensitivity, label="Sensitivity")
     plt.plot(thresholds, specificity, label="Specificity")
-    plt.plot(thresholds, ppv, label="Positive Predictive Value")
-    plt.plot(thresholds, npv, label="Negative Predictive Value")
-    plt.plot(thresholds, ba, label="Balanced Accuracy")
+    plt.plot(thresholds, fnr, label="False Negative Rate")
+    plt.plot(thresholds, fpr, label="False Positive Rate")
     plt.xticks(thresholds)
+    plt.legend()
+    plt.show()
+    plt.plot(fpr, sensitivity, label="Neural Network")
+    plt.plot([0, 0.5, 1], [0, 0.5, 1], label="Random Classifier")
+    plt.xlabel("False Positive Rate")
+    plt.ylabel("True Positive Rate")
+    plt.xlim(0, 1)
+    plt.ylim(0, 1)
     plt.legend()
     plt.show()
 

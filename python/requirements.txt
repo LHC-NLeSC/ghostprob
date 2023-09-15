@@ -3,3 +3,5 @@ onnx
 onnx2torch
 numpy
 ROOT
+ray
+pandas

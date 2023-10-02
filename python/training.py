@@ -1,15 +1,21 @@
 import argparse
+import os
 from functools import partial
 import logging
 import pickle
 import numpy as np
+from pathlib import Path
+from sklearn.ensemble import RandomForestClassifier
 import torch
+import xgboost as xgboost
+from sklearn.decomposition import PCA
 from torch.utils.data import DataLoader
 from torch import nn
 import ray
 from ray import tune
 from ray.tune.schedulers import ASHAScheduler
 
+from classification_performance_metrics import print_performance_metrics, save_performance_metrics
 from utilities import (
     GhostDataset,
     QuietReporter,
@@ -19,6 +25,8 @@ from utilities import (
     select_optimizer,
 )
 from networks import GhostNetwork, GhostNetworkExperiment
+
+CLASS_NAMES = ['real', 'ghost']
 
 
 def command_line():
@@ -54,6 +62,8 @@ def command_line():
     parser.add_argument(
         "--save", help="Save the trained model to disk", action="store_true"
     )
+    parser.add_argument('--learner_type', type=str,
+                        help=f'ml model type; choose from ["nn", "xgboost","pcaxgboost", "rf"].', default='nn')
     return parser.parse_args()
 
 
@@ -94,15 +104,79 @@ def __main__():
         torch.tensor(data_test, dtype=torch.float32, device=device),
         torch.tensor(labels_test, dtype=torch.float32, device=device),
     )
+
+    if arguments.learner_type == 'nn':
+        train_and_tune_hyperparameters_and_evaluate_nn(training_dataset, validation_dataset, test_dataset,
+                                                       arguments.save,
+                                                       arguments.epochs, arguments.threshold, arguments.num_samples,
+                                                       device,
+                                                       arguments.cpu, arguments.gpu, arguments.int8)
+    else:
+        if arguments.learner_type == 'xgboost':
+            predicted, probs, _feature_importances_ = train_and_tune_hyperparameters_and_evaluate_xgboost(
+                training_dataset.data, test_dataset.data, training_dataset.labels, test_dataset.labels)
+        elif arguments.learner_type == 'rf':
+            predicted, probs, _feature_importances_ = train_and_tune_hyperparameters_and_evaluate_rf(
+                training_dataset.data, test_dataset.data, training_dataset.labels, test_dataset.labels)
+        elif arguments.learner_type == 'pcaxgboost':
+            predicted, probs, _feature_importances_ = train_and_tune_hyperparameters_and_evaluate_pca_xgboost(
+                training_dataset.data, test_dataset.data, training_dataset.labels, test_dataset.labels)
+        probs = list(probs)
+        test_labels = [class_id_to_label(class_id) for class_id in test_dataset.labels.numpy()[:, 0].astype(int)]
+        output_path = Path(f'output_{arguments.learner_type}')
+        os.makedirs(output_path, exist_ok=True)
+        save_performance_metrics(test_labels, predicted, probs, CLASS_NAMES, output_path, positive_label=CLASS_NAMES[1])
+
+
+def train_and_tune_hyperparameters_and_evaluate_pca_xgboost(X_train, X_validation, y_train, y_val):
+    pca = PCA()
+    pca = pca.fit(X_train)
+    top_n_components = X_train.shape[1]
+    X_train_pc = pca.transform(X_train)[:, :top_n_components]
+    X_validation_pc = pca.transform(X_validation)[:, :top_n_components]
+
+    return train_and_tune_hyperparameters_and_evaluate_xgboost(X_train_pc, X_validation_pc, y_train, y_val)
+
+
+def class_id_to_label(class_id):
+    return CLASS_NAMES[class_id]
+
+
+def train_and_tune_hyperparameters_and_evaluate_xgboost(X_train, X_validation, y_train, y_val):
+    n_trees = 500
+    clf = xgboost.XGBClassifier(n_estimators=n_trees)
+
+    clf.fit(X_train, y_train)
+
+    predicted = [class_id_to_label(class_id) for class_id in clf.predict(X_validation)]
+    probs = clf.predict_proba(X_validation)[:, 1]
+
+    return predicted, probs, clf.feature_importances_
+
+
+def train_and_tune_hyperparameters_and_evaluate_rf(X_train, X_validation, y_train, y_val):
+    n_trees = 500
+    clf = RandomForestClassifier(n_estimators=n_trees)
+
+    clf.fit(X_train, y_train)
+
+    predicted = [class_id_to_label(int(class_id)) for class_id in clf.predict(X_validation)]
+    probs = clf.predict_proba(X_validation)[:, 1]
+
+    return predicted, probs, clf.feature_importances_
+
+
+def train_and_tune_hyperparameters_and_evaluate_nn(training_dataset, validation_dataset, test_dataset, save, epochs,
+                                                   threshold, num_samples, device, cpu, gpu, int8):
     # training and tuning hyperparameters
-    num_features = data_train.shape[1]
-    num_epochs = arguments.epochs
+    num_features = training_dataset.data.shape[1]
+    num_epochs = epochs
     tuning_config = {
         "l0": tune.choice(
             [i for i in range(int(num_features / 3), int(num_features * 3), 4)]
         ),
         "learning": tune.loguniform(1e-6, 1e-1),
-        "batch": tune.choice([2**i for i in range(1, 15)]),
+        "batch": tune.choice([2 ** i for i in range(1, 15)]),
         "epochs": tune.choice([num_epochs]),
         "optimizer": tune.choice([0, 1]),
         "activation": tune.choice(
@@ -144,11 +218,11 @@ def __main__():
             loss_function=loss_function,
             training_dataset=training_dataset,
             validation_dataset=validation_dataset,
-            threshold=arguments.threshold,
+            threshold=threshold,
         ),
-        resources_per_trial={"cpu": arguments.cpu, "gpu": arguments.gpu},
+        resources_per_trial={"cpu": cpu, "gpu": gpu},
         config=tuning_config,
-        num_samples=arguments.num_samples,
+        num_samples=num_samples,
         scheduler=scheduler,
         storage_path="./ray_logs",
         checkpoint_score_attr="loss",
@@ -178,13 +252,13 @@ def __main__():
     # test accuracy
     test_dataloader = DataLoader(test_dataset, batch_size=best_trial.config["batch"])
     accuracy, loss = testing_loop(
-        device, model, test_dataloader, loss_function, arguments.threshold
+        device, model, test_dataloader, loss_function, threshold
     )
     print(f"Test Accuracy: {accuracy * 100.0:.2f}%")
     print(f"Test Loss: {loss:.6f}")
     print()
     # save model
-    if arguments.save:
+    if save:
         print("Saving model to disk")
         torch.save(model.state_dict(), "ghost_model.pth")
         with open("ghost_model_config.pkl", "wb") as file:
@@ -195,7 +269,7 @@ def __main__():
         model.to("cpu")
         torch.onnx.export(model, dummy_input, "ghost_model.onnx", export_params=True)
     # INT8 quantization
-    if arguments.int8:
+    if int8:
         print("INT8 quantization")
         model.qconfig = torch.quantization.get_default_qat_qconfig("fbgemm")
         model_prepared = torch.quantization.prepare_qat(model.train())
@@ -215,7 +289,7 @@ def __main__():
         print(model_int8)
         print()
         # save model
-        if arguments.save:
+        if save:
             print("Saving INT8 model to disk")
             torch.save(model_int8, "ghost_model_int8.pth")
             print("Saving INT8 model to ONNX format")

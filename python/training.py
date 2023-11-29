@@ -45,6 +45,7 @@ def command_line():
     parser.add_argument(
         "--cpu", help="Number of CPU cores to use for training.", type=int, default=1
     )
+    parser.add_argument("--cuda", help="ID of the CUDA device.", type=int, default=0)
     parser.add_argument(
         "--gpu", help="Number of GPUs to use for training.", type=int, default=0
     )
@@ -60,7 +61,7 @@ def command_line():
 def __main__():
     arguments = command_line()
     if not arguments.nocuda and torch.cuda.is_available():
-        device = torch.device("cuda")
+        device = torch.device(f"cuda:{arguments.cuda}")
     else:
         device = torch.device("cpu")
     print(f"Device: {device}")

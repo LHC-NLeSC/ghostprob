@@ -14,6 +14,7 @@ def command_line():
         type=str,
         required=True,
     )
+    parser.add_argument("--fraction", help="Fraction of ghosts to include in dataset", type=float, default=1.0)
     parser.add_argument(
         "--output", help="Prefix for the output file", type=str, required=True
     )
@@ -46,6 +47,7 @@ def __main__():
     print(
         f"Number of ghosts ({len(data_ghost)}) and real tracks ({len(data_real)}) in data set"
     )
+    data_ghost = data_ghost[:int(arguments.fraction * len(data_ghost))]
     # select the same number of real tracks as there are ghosts
     rng = np.random.default_rng()
     rng.shuffle(data_real)

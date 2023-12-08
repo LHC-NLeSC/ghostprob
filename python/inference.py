@@ -180,6 +180,7 @@ def __main__():
     specificity = list()
     fnr = list()
     fpr = list()
+    ppv = list()
     for i in range(0, len(thresholds)):
         print(f"Threshold {thresholds[i]}")
         g_tp.append(tp[i] / tracks)
@@ -192,6 +193,7 @@ def __main__():
         specificity.append(tn[i] / (tn[i] + fp[i]))
         fnr.append(fn[i] / (fn[i] + tp[i]))
         fpr.append(fp[i] / (fp[i] + tn[i]))
+        ppv.append(tp[i]/ (tp[i] + fp[i]))
         print(f"\tTracks: {nn_real[i] * 100.0:.2f}%")
         print(f"\tGhosts: {nn_ghost[i] * 100.0:.2f}%")
         print()
@@ -234,6 +236,10 @@ def __main__():
     plt.ylim(0, 1)
     plt.legend()
     plt.show()
+    J = np.asarray(sensitivity) - np.asarray(fpr)
+    f1_score = (np.asarray(tp) * 2) / (np.asarray(tp) * 2 + np.asarray(fp) + np.asarray(fn))
+    print(f"Best threshold (J): {thresholds[np.argmax(J)]}")
+    print(f"Best threshold (F1): {thresholds[np.argmax(f1_score)]}")
 
 
 if __name__ == "__main__":

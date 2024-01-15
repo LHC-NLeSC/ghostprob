@@ -1,7 +1,8 @@
 import argparse
 import numpy as np
+import matplotlib.pyplot as plt
 
-from utilities import load_data, shuffle_data, remove_nans
+from utilities import load_data, shuffle_data, remove_nans, normalize
 from data import label, training_columns
 
 
@@ -14,9 +15,20 @@ def command_line():
         type=str,
         required=True,
     )
-    parser.add_argument("--fraction", help="Fraction of ghosts to include in dataset", type=float, default=1.0)
+    parser.add_argument(
+        "--fraction",
+        help="Fraction of ghosts to include in dataset",
+        type=float,
+        default=1.0,
+    )
     parser.add_argument(
         "--output", help="Prefix for the output file", type=str, required=True
+    )
+    parser.add_argument(
+        "--plot", help="Plot the histogram for each feature.", action="store_true"
+    )
+    parser.add_argument(
+        "--normalize", help="Normalize features in [0, 1].", action="store_true"
     )
     return parser.parse_args()
 
@@ -40,6 +52,26 @@ def __main__():
     data = [dataframe[column] for column in trainining_columns]
     # Remove NaNs
     data, labels = remove_nans(data, labels)
+    # Plot histograms and interval
+    if arguments.plot:
+        for column in training_columns:
+            feature = dataframe[column]
+            print(f"Feature: {column} ({np.min(feature)}, {np.max(feature)})")
+            counts, bins = np.histogram(feature)
+            plt.title(f"Feature: {column}")
+            plt.stairs(counts, bins, fill=True)
+            plt.show()
+    # Normalize each feature
+    if arguments.normalize:
+        for feature_id in range(len(data)):
+            print(
+                f"Feature: {feature_id} ({np.min(data[feature_id])}, {np.max(data[feature_id])})"
+            )
+            data[feature_id] = normalize(data[feature_id])
+            print(
+                f"Feature: {feature_id} ({np.min(data[feature_id])}, {np.max(data[feature_id])})"
+            )
+            print()
     # split into real and ghost tracks
     data = np.hstack([data[i].reshape(len(data[0]), 1) for i in range(len(data))])
     data_ghost = data[labels == 1]
@@ -47,7 +79,7 @@ def __main__():
     print(
         f"Number of ghosts ({len(data_ghost)}) and real tracks ({len(data_real)}) in data set"
     )
-    data_ghost = data_ghost[:int(arguments.fraction * len(data_ghost))]
+    data_ghost = data_ghost[: int(arguments.fraction * len(data_ghost))]
     # select the same number of real tracks as there are ghosts
     rng = np.random.default_rng()
     rng.shuffle(data_real)

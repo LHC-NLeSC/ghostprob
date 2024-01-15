@@ -15,6 +15,7 @@ from utilities import (
     testing_loop,
     remove_nans,
     testing_accuracy,
+    normalize,
 )
 from networks import GhostNetwork, GhostNetworkExperiment
 from data import label, training_columns
@@ -67,6 +68,11 @@ def command_line():
         type=str,
         required=True,
     )
+    parser.add_argument(
+        "--normalize",
+        help="Normalize input data before inference.",
+        action="store_true",
+    )
     parser.add_argument("--int8", help="INT8 quantization.", action="store_true")
     return parser.parse_args()
 
@@ -94,6 +100,10 @@ def __main__():
         data = [dataframe[column] for column in training_columns]
         # Remove NaNs
         data, labels = remove_nans(data, labels)
+        # Normalize
+        if arguments.normalize:
+            for feature_id in range(len(data)):
+                data[feature_id] = normalize(data[feature_id])
         # Shuffle
         data = np.hstack([data[i].reshape(len(data[0]), 1) for i in range(len(data))])
         rng = np.random.default_rng()
@@ -120,11 +130,11 @@ def __main__():
         if "onnx" in arguments.model:
             model = onnx2torch.convert(arguments.model)
         else:
-            model = GhostNetwork(
+            model = GhostNetworkExperiment(
                 num_features=num_features,
                 l0=model_config["l0"],
                 activation=model_config["activation"],
-                normalization=model_config["normalization"],
+                # normalization=model_config["normalization"],
             )
             weights = torch.load(arguments.model)
             model.load_state_dict(weights)
@@ -193,7 +203,7 @@ def __main__():
         specificity.append(tn[i] / (tn[i] + fp[i]))
         fnr.append(fn[i] / (fn[i] + tp[i]))
         fpr.append(fp[i] / (fp[i] + tn[i]))
-        ppv.append(tp[i]/ (tp[i] + fp[i]))
+        ppv.append(tp[i] / (tp[i] + fp[i]))
         print(f"\tTracks: {nn_real[i] * 100.0:.2f}%")
         print(f"\tGhosts: {nn_ghost[i] * 100.0:.2f}%")
         print()
@@ -237,7 +247,9 @@ def __main__():
     plt.legend()
     plt.show()
     J = np.asarray(sensitivity) - np.asarray(fpr)
-    f1_score = (np.asarray(tp) * 2) / (np.asarray(tp) * 2 + np.asarray(fp) + np.asarray(fn))
+    f1_score = (np.asarray(tp) * 2) / (
+        np.asarray(tp) * 2 + np.asarray(fp) + np.asarray(fn)
+    )
     print(f"Best threshold (J): {thresholds[np.argmax(J)]}")
     print(f"Best threshold (F1): {thresholds[np.argmax(f1_score)]}")
 

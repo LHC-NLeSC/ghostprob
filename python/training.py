@@ -118,15 +118,9 @@ def __main__():
                 nn.Softmin,
             ]
         ),
-        "normalization": tune.choice(
-            [
-                nn.BatchNorm1d,
-                nn.LazyBatchNorm1d,
-                nn.SyncBatchNorm,
-                nn.InstanceNorm1d,
-                nn.LayerNorm,
-            ]
-        ),
+        # "normalization": tune.choice(
+        #     [nn.BatchNorm1d, nn.LazyBatchNorm1d, nn.SyncBatchNorm, nn.InstanceNorm1d]
+        # ),
     }
     scheduler = ASHAScheduler(
         metric="loss",
@@ -162,11 +156,11 @@ def __main__():
     print(f"Best trial final validation accuracy: {best_trial.last_result['accuracy']}")
     # load best model
     best_checkpoint = best_trial.checkpoint.to_air_checkpoint()
-    model = GhostNetwork(
+    model = GhostNetworkExperiment(
         num_features,
         l0=best_trial.config["l0"],
         activation=best_trial.config["activation"],
-        normalization=best_trial.config["normalization"],
+        # normalization=best_trial.config["normalization"],
     )
     model.load_state_dict(best_checkpoint.to_dict()["net_state_dict"])
     model.to(device)
@@ -187,14 +181,14 @@ def __main__():
     # save model
     if arguments.save:
         print("Saving model to disk")
+        model.to("cpu")
         torch.save(model.state_dict(), "ghost_model.pth")
         with open("ghost_model_config.pkl", "wb") as file:
             pickle.dump(best_trial.config, file)
         print("Saving model to ONNX format")
-        dummy_input = torch.randn(1, num_features)
+        dummy_input = torch.randn(int(best_trial.config["batch"]), num_features)
         dummy_input.to("cpu")
-        model.to("cpu")
-        torch.onnx.export(model, dummy_input, "ghost_model.onnx", export_params=True)
+        model_onnx = torch.onnx.export(model, dummy_input, "ghost_model.onnx")
     # INT8 quantization
     if arguments.int8:
         print("INT8 quantization")

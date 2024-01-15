@@ -60,11 +60,11 @@ def training_loop(
         validation_dataset, batch_size=int(config["batch"])
     )
     # model
-    model = GhostNetwork(
+    model = GhostNetworkExperiment(
         num_features,
         l0=config["l0"],
         activation=config["activation"],
-        normalization=config["normalization"],
+        # normalization=config["normalization"],
     )
     optimizer = select_optimizer(config, model)
     model.to(device)
@@ -168,3 +168,11 @@ def remove_nans(data, labels):
             labels = labels[index]
     print(f"Number of columns with NaN: {corrected_columns}")
     return data, labels
+
+
+def normalize(data: np.array) -> np.array:
+    min = np.min(data)
+    max = np.max(data)
+    if np.isfinite(np.random.rand(1) / (max - min)):
+        return (data - min) / (max - min)
+    return data

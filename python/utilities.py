@@ -173,6 +173,7 @@ def remove_nans(data, labels):
 def normalize(data: np.array) -> np.array:
     min = np.min(data)
     max = np.max(data)
-    if np.isfinite(np.random.rand(1) / (max - min)):
-        return (data - min) / (max - min)
+    with np.errstate(divide='ignore'):
+        if np.isfinite(np.random.rand(1) / (max - min)):
+            return (data - min) / (max - min)
     return data

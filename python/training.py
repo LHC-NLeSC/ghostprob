@@ -18,7 +18,7 @@ from utilities import (
     testing_loop,
     select_optimizer,
 )
-from networks import GhostNetwork, GhostNetworkExperiment
+from networks import GhostNetwork, GhostNetworkWithNormalization
 
 
 def command_line():
@@ -32,6 +32,7 @@ def command_line():
     )
     parser.add_argument("--nocuda", help="Disable CUDA", action="store_true")
     # parameters
+    parser.add_argument("--network", help="Network to train", type=int, choices=range(0, 2), default=0)
     parser.add_argument("--epochs", help="Number of epochs", type=int, default=256)
     parser.add_argument(
         "-n",
@@ -117,11 +118,12 @@ def __main__():
                 nn.Softmax,
                 nn.Softmin,
             ]
-        ),
-        # "normalization": tune.choice(
-        #     [nn.BatchNorm1d, nn.LazyBatchNorm1d, nn.SyncBatchNorm, nn.InstanceNorm1d]
-        # ),
+        )
     }
+    if arguments.network == 1:
+        tuning_config["normalization"] = tune.choice(
+            [nn.BatchNorm1d, nn.LazyBatchNorm1d, nn.SyncBatchNorm, nn.InstanceNorm1d]
+        )
     scheduler = ASHAScheduler(
         metric="loss",
         mode="min",
@@ -156,12 +158,19 @@ def __main__():
     print(f"Best trial final validation accuracy: {best_trial.last_result['accuracy']}")
     # load best model
     best_checkpoint = best_trial.checkpoint.to_air_checkpoint()
-    model = GhostNetworkExperiment(
-        num_features,
-        l0=best_trial.config["l0"],
-        activation=best_trial.config["activation"],
-        # normalization=best_trial.config["normalization"],
-    )
+    if arguments.network == 0:
+        model = GhostNetwork(
+            num_features,
+            l0=best_trial.config["l0"],
+            activation=best_trial.config["activation"],
+        )
+    elif arguments.network == 1:
+        model = GhostNetworkWithNormalization(
+            num_features,
+            l0=best_trial.config["l0"],
+            activation=best_trial.config["activation"],
+            normalization=best_trial.config["normalization"],
+        )
     model.load_state_dict(best_checkpoint.to_dict()["net_state_dict"])
     model.to(device)
     print()

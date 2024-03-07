@@ -17,7 +17,7 @@ from utilities import (
     testing_accuracy,
     normalize,
 )
-from networks import GhostNetwork, GhostNetworkExperiment
+from networks import GhostNetwork, GhostNetworkWithNormalization
 from data import label, training_columns
 
 thresholds = [
@@ -73,6 +73,7 @@ def command_line():
         help="Normalize input data before inference.",
         action="store_true",
     )
+    parser.add_argument("--network", help="Network to train", type=int, choices=range(0, 2), default=0)
     parser.add_argument("--int8", help="INT8 quantization.", action="store_true")
     return parser.parse_args()
 
@@ -130,12 +131,19 @@ def __main__():
         if "onnx" in arguments.model:
             model = onnx2torch.convert(arguments.model)
         else:
-            model = GhostNetworkExperiment(
-                num_features=num_features,
-                l0=model_config["l0"],
-                activation=model_config["activation"],
-                # normalization=model_config["normalization"],
-            )
+            if arguments.network == 0:
+                model = GhostNetwork(
+                    num_features,
+                    l0=model_config["l0"],
+                    activation=model_config["activation"],
+                )
+            elif arguments.network == 1:
+                model = GhostNetworkWithNormalization(
+                    num_features,
+                    l0=model_config["l0"],
+                    activation=model_config["activation"],
+                    normalization=model_config["normalization"],
+                )
             weights = torch.load(arguments.model)
             model.load_state_dict(weights)
     model.to(device)

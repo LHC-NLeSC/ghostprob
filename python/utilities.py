@@ -5,7 +5,7 @@ from torch.utils.data import Dataset, DataLoader
 from ray.air import Checkpoint, session
 from ray.tune import CLIReporter
 
-from networks import GhostNetwork, GhostNetworkExperiment
+from networks import GhostNetwork, GhostNetworkWithNormalization
 
 
 class GhostDataset(Dataset):
@@ -53,6 +53,7 @@ def training_loop(
     loss_function,
     training_dataset,
     validation_dataset,
+    network,
     threshold=0.5,
 ):
     training_dataloader = DataLoader(training_dataset, batch_size=int(config["batch"]))
@@ -60,12 +61,19 @@ def training_loop(
         validation_dataset, batch_size=int(config["batch"])
     )
     # model
-    model = GhostNetworkExperiment(
-        num_features,
-        l0=config["l0"],
-        activation=config["activation"],
-        # normalization=config["normalization"],
-    )
+    if network == 0:
+        model = GhostNetwork(
+            num_features,
+            l0=config["l0"],
+            activation=config["activation"],
+        )
+    elif network == 1:
+        model = GhostNetworkWithNormalization(
+            num_features,
+            l0=config["l0"],
+            activation=config["activation"],
+            normalization=config["normalization"],
+        )
     optimizer = select_optimizer(config, model)
     model.to(device)
     # checkpointing

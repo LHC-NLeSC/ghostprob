@@ -1,6 +1,7 @@
 import argparse
 import logging
 import pickle
+import os
 import numpy as np
 import torch
 from torch.utils.data import DataLoader
@@ -154,10 +155,13 @@ def __main__():
     result = tuner.fit()
     best_trial = result.get_best_trial("loss", "min", "last")
     print(f"Best trial config: {best_trial.config}")
-    print(f"Best trial final validation loss: {best_trial.last_result['loss']}")
-    print(f"Best trial final validation accuracy: {best_trial.last_result['accuracy']}")
+    print(f"Best trial final validation loss: {best_trial.metrics['loss']}")
+    print(f"Best trial final validation accuracy: {best_trial.metrics['accuracy']}")
     # load best model
-    best_checkpoint = best_trial.checkpoint.to_air_checkpoint()
+    checkpoint_path = os.path.join(
+        best_trial.checkpoint.to_directory(), "ghost_checkpoint.pt"
+    )
+    model_state, _ = torch.load(checkpoint_path)
     if arguments.network == 0:
         model = GhostNetwork(
             num_features,
@@ -171,7 +175,7 @@ def __main__():
             activation=best_trial.config["activation"],
             normalization=best_trial.config["normalization"],
         )
-    model.load_state_dict(best_checkpoint.to_dict()["net_state_dict"])
+    model.load_state_dict(model_state)
     model.to(device)
     print()
     print(model)

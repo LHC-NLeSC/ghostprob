@@ -1,8 +1,10 @@
+import os
+import tempfile
 from ROOT import TFile, RDataFrame
 import torch
 import numpy as np
 from torch.utils.data import Dataset, DataLoader
-from ray.train import report
+from ray.train import Checkpoint, get_checkpoint, report
 
 from networks import GhostNetwork, GhostNetworkWithNormalization
 
@@ -62,6 +64,14 @@ def training_loop(config):
         )
     optimizer = select_optimizer(config, model)
     model.to(config["device"])
+    if get_checkpoint():
+        loaded_checkpoint = get_checkpoint()
+        with loaded_checkpoint.as_directory() as loaded_checkpoint_dir:
+            model_state, optimizer_state = torch.load(
+                os.path.join(loaded_checkpoint_dir, "ghost_checkpoint.pt")
+            )
+            model.load_state_dict(model_state)
+            optimizer.load_state_dict(optimizer_state)
     start_epoch = 0
     num_epochs = config["epochs"]
     for epoch in range(start_epoch, num_epochs):
@@ -79,7 +89,12 @@ def training_loop(config):
             config["loss_function"],
             config["threshold"],
         )
-        report(metrics={"loss": loss, "accuracy": accuracy})
+        metrics = {"loss": loss, "accuracy": accuracy}
+        with tempfile.TemporaryDirectory() as temp_checkpoint_dir:
+            path = os.path.join(temp_checkpoint_dir, "ghost_checkpoint.pt")
+            torch.save((model.state_dict(), optimizer.state_dict()), path)
+            checkpoint = Checkpoint.from_directory(temp_checkpoint_dir)
+            report(metrics=metrics, checkpoint=checkpoint)
 
 
 def inner_training_loop(model, dataloader, device, optimizer, loss_function):

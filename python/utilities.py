@@ -4,7 +4,7 @@ from ROOT import TFile, RDataFrame
 import torch
 import numpy as np
 from torch.utils.data import Dataset, DataLoader
-from ray.train import Checkpoint, get_checkpoint, report
+from ray import train
 
 from networks import GhostNetwork, GhostNetworkWithNormalization
 
@@ -64,8 +64,8 @@ def training_loop(config):
         )
     optimizer = select_optimizer(config, model)
     model.to(config["device"])
-    if get_checkpoint():
-        loaded_checkpoint = get_checkpoint()
+    if train.get_checkpoint():
+        loaded_checkpoint = train.get_checkpoint()
         with loaded_checkpoint.as_directory() as loaded_checkpoint_dir:
             model_state, optimizer_state = torch.load(
                 os.path.join(loaded_checkpoint_dir, "ghost_checkpoint.pt")
@@ -93,8 +93,8 @@ def training_loop(config):
         with tempfile.TemporaryDirectory() as temp_checkpoint_dir:
             path = os.path.join(temp_checkpoint_dir, "ghost_checkpoint.pt")
             torch.save((model.state_dict(), optimizer.state_dict()), path)
-            checkpoint = Checkpoint.from_directory(temp_checkpoint_dir)
-            report(metrics=metrics, checkpoint=checkpoint)
+            checkpoint = train.Checkpoint.from_directory(temp_checkpoint_dir)
+            train.report(metrics=metrics, checkpoint=checkpoint)
 
 
 def inner_training_loop(model, dataloader, device, optimizer, loss_function):
@@ -112,9 +112,11 @@ def inner_training_loop(model, dataloader, device, optimizer, loss_function):
 def testing_loop(device, model, dataloader, loss_function, threshold=0.5):
     accuracy = 0.0
     epoch_loss = 0.0
+    steps = 0
     model.eval()
     with torch.no_grad():
         for x, y in dataloader:
+            steps = steps + 1
             x = x.to(device)
             y = y.to(device)
             prediction = model(x)
@@ -126,7 +128,7 @@ def testing_loop(device, model, dataloader, loss_function, threshold=0.5):
             loss = loss_function(prediction, y)
             epoch_loss = epoch_loss + loss.item()
             accuracy = accuracy + ((prediction > threshold).float() == y).float().mean()
-    epoch_loss = epoch_loss / len(dataloader)
+    epoch_loss = epoch_loss / steps
     accuracy = accuracy / len(dataloader)
     return accuracy, epoch_loss
 

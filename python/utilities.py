@@ -46,36 +46,27 @@ def select_optimizer(config, model):
     return optimizer
 
 
-def training_loop(
-    config,
-    num_features,
-    device,
-    loss_function,
-    training_dataset,
-    validation_dataset,
-    network,
-    threshold=0.5,
-):
-    training_dataloader = DataLoader(training_dataset, batch_size=int(config["batch"]))
+def training_loop(config):
+    training_dataloader = DataLoader(config["training_dataset"], batch_size=int(config["batch"]))
     validation_dataloader = DataLoader(
-        validation_dataset, batch_size=int(config["batch"])
+        config["validation_dataset"], batch_size=int(config["batch"])
     )
     # model
-    if network == 0:
+    if config["network"] == 0:
         model = GhostNetwork(
-            num_features,
+            config["num_features"],
             l0=config["l0"],
             activation=config["activation"],
         )
-    elif network == 1:
+    elif config["network"] == 1:
         model = GhostNetworkWithNormalization(
-            num_features,
+            config["num_features"],
             l0=config["l0"],
             activation=config["activation"],
             normalization=config["normalization"],
         )
     optimizer = select_optimizer(config, model)
-    model.to(device)
+    model.to(config["device"])
     # checkpointing
     checkpoint = session.get_checkpoint()
     if checkpoint:
@@ -88,10 +79,10 @@ def training_loop(
     num_epochs = config["epochs"]
     for epoch in range(start_epoch, num_epochs):
         inner_training_loop(
-            model, training_dataloader, device, optimizer, loss_function
+            model, training_dataloader, config["device"], optimizer, config["loss_function"]
         )
         accuracy, loss = testing_loop(
-            device, model, validation_dataloader, loss_function, threshold
+            config["device"], model, validation_dataloader, config["loss_function"], config["threshold"]
         )
         checkpoint_data = {
             "epoch": epoch,

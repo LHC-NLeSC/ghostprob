@@ -30,7 +30,6 @@ def command_line():
         type=str,
         required=True,
     )
-    parser.add_argument("--nocuda", help="Disable CUDA", action="store_true")
     # parameters
     parser.add_argument("--network", help="Network to train", type=int, choices=range(0, 2), default=0)
     parser.add_argument("--epochs", help="Number of epochs", type=int, default=256)
@@ -46,6 +45,7 @@ def command_line():
     parser.add_argument(
         "--cpu", help="Number of CPU cores to use for training.", type=int, default=1
     )
+    parser.add_argument("--nocuda", help="Disable CUDA", action="store_true")
     parser.add_argument("--cuda", help="ID of the CUDA device.", type=int, default=0)
     parser.add_argument(
         "--gpu", help="Number of GPUs to use for training.", type=int, default=0
@@ -96,16 +96,27 @@ def __main__():
         torch.tensor(data_test, dtype=torch.float32, device=device),
         torch.tensor(labels_test, dtype=torch.float32, device=device),
     )
-    # training and tuning hyperparameters
     num_features = data_train.shape[1]
     num_epochs = arguments.epochs
+    scheduler = ASHAScheduler(
+        metric="loss",
+        mode="min",
+        max_t=num_epochs,
+        grace_period=2,
+        reduction_factor=2,
+    )
+    reporter = QuietReporter(metric_columns=["loss", "accuracy", "training_iteration"])
+    loss_function = nn.BCELoss()
+    # search space
     tuning_config = {
+        "num_features": num_features,
+        "threshold": arguments.threshold,
         "l0": tune.choice(
             [i for i in range(int(num_features / 3), int(num_features * 3), 4)]
         ),
         "learning": tune.loguniform(1e-6, 1e-1),
         "batch": tune.choice([2**i for i in range(1, 15)]),
-        "epochs": tune.choice([num_epochs]),
+        "epochs": num_epochs,
         "optimizer": tune.choice([0, 1]),
         "activation": tune.choice(
             [
@@ -118,40 +129,31 @@ def __main__():
                 nn.Softmax,
                 nn.Softmin,
             ]
-        )
+        ),
+        "training_dataset": training_dataset,
+        "validation_dataset": validation_dataset,
+        "network": arguments.network,
+        "device": device,
+        "loss_function": loss_function
     }
     if arguments.network == 1:
         tuning_config["normalization"] = tune.choice(
             [nn.BatchNorm1d, nn.LazyBatchNorm1d, nn.SyncBatchNorm, nn.InstanceNorm1d]
         )
-    scheduler = ASHAScheduler(
-        metric="loss",
-        mode="min",
-        max_t=num_epochs,
-        grace_period=2,
-        reduction_factor=2,
-    )
-    reporter = QuietReporter(metric_columns=["loss", "accuracy", "training_iteration"])
-    loss_function = nn.BCELoss()
-    result = tune.run(
-        partial(
-            training_loop,
-            num_features=num_features,
-            device=device,
-            loss_function=loss_function,
-            training_dataset=training_dataset,
-            validation_dataset=validation_dataset,
-            threshold=arguments.threshold,
+    tuner = tune.Tuner(
+        tune.with_resources(
+            tune.with_parameters(training_loop),
+            resources={"cpu": arguments.cpu, "gpu": arguments.gpu}
+            ),
+        tune_config=tune.TuneConfig(
+            metric="loss",
+            mode="min",
+            scheduler=scheduler,
+            num_samples=arguments.num_samples
         ),
-        resources_per_trial={"cpu": arguments.cpu, "gpu": arguments.gpu},
-        config=tuning_config,
-        num_samples=arguments.num_samples,
-        scheduler=scheduler,
-        storage_path="./ray_logs",
-        checkpoint_score_attr="loss",
-        progress_reporter=reporter,
-        verbose=1,
+        param_space=tuning_config
     )
+    result = tuner.fit()
     best_trial = result.get_best_trial("loss", "min", "last")
     print(f"Best trial config: {best_trial.config}")
     print(f"Best trial final validation loss: {best_trial.last_result['loss']}")

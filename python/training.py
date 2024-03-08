@@ -31,7 +31,9 @@ def command_line():
         required=True,
     )
     # parameters
-    parser.add_argument("--network", help="Network to train", type=int, choices=range(0, 2), default=0)
+    parser.add_argument(
+        "--network", help="Network to train", type=int, choices=range(0, 2), default=0
+    )
     parser.add_argument("--epochs", help="Number of epochs", type=int, default=256)
     parser.add_argument(
         "-n",
@@ -134,7 +136,7 @@ def __main__():
         "validation_dataset": validation_dataset,
         "network": arguments.network,
         "device": device,
-        "loss_function": loss_function
+        "loss_function": loss_function,
     }
     if arguments.network == 1:
         tuning_config["normalization"] = tune.choice(
@@ -143,15 +145,12 @@ def __main__():
     tuner = tune.Tuner(
         tune.with_resources(
             tune.with_parameters(training_loop),
-            resources={"cpu": arguments.cpu, "gpu": arguments.gpu}
-            ),
-        tune_config=tune.TuneConfig(
-            metric="loss",
-            mode="min",
-            scheduler=scheduler,
-            num_samples=arguments.num_samples
+            resources={"cpu": arguments.cpu, "gpu": arguments.gpu},
         ),
-        param_space=tuning_config
+        tune_config=tune.TuneConfig(
+            scheduler=scheduler, num_samples=arguments.num_samples
+        ),
+        param_space=tuning_config,
     )
     result = tuner.fit()
     best_trial = result.get_best_trial("loss", "min", "last")

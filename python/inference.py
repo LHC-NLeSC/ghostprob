@@ -74,9 +74,15 @@ def command_line():
         action="store_true",
     )
     parser.add_argument(
-        "--track", help="Forward or Matching", type=str, choices=["forward", "matching"], required=True
+        "--track",
+        help="Forward or Matching",
+        type=str,
+        choices=["forward", "matching"],
+        required=True,
     )
-    parser.add_argument("--network", help="Network to train", type=int, choices=range(0, 2), default=0)
+    parser.add_argument(
+        "--network", help="Network to train", type=int, choices=range(0, 2), default=0
+    )
     parser.add_argument("--int8", help="INT8 quantization.", action="store_true")
     return parser.parse_args()
 

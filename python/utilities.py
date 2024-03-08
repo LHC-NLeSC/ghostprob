@@ -47,7 +47,9 @@ def select_optimizer(config, model):
 
 
 def training_loop(config):
-    training_dataloader = DataLoader(config["training_dataset"], batch_size=int(config["batch"]))
+    training_dataloader = DataLoader(
+        config["training_dataset"], batch_size=int(config["batch"])
+    )
     validation_dataloader = DataLoader(
         config["validation_dataset"], batch_size=int(config["batch"])
     )
@@ -79,10 +81,18 @@ def training_loop(config):
     num_epochs = config["epochs"]
     for epoch in range(start_epoch, num_epochs):
         inner_training_loop(
-            model, training_dataloader, config["device"], optimizer, config["loss_function"]
+            model,
+            training_dataloader,
+            config["device"],
+            optimizer,
+            config["loss_function"],
         )
         accuracy, loss = testing_loop(
-            config["device"], model, validation_dataloader, config["loss_function"], config["threshold"]
+            config["device"],
+            model,
+            validation_dataloader,
+            config["loss_function"],
+            config["threshold"],
         )
         checkpoint_data = {
             "epoch": epoch,
@@ -172,7 +182,7 @@ def remove_nans(data, labels):
 def normalize(data: np.array) -> np.array:
     min = np.min(data)
     max = np.max(data)
-    with np.errstate(divide='ignore'):
+    with np.errstate(divide="ignore"):
         if np.isfinite(np.random.rand(1) / (max - min)):
             return (data - min) / (max - min)
     return data

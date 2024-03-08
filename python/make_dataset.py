@@ -31,7 +31,11 @@ def command_line():
         "--normalize", help="Normalize features in [0, 1].", action="store_true"
     )
     parser.add_argument(
-        "--track", help="Forward or Matching", type=str, choices=["forward", "matching"], required=True
+        "--track",
+        help="Forward or Matching",
+        type=str,
+        choices=["forward", "matching"],
+        required=True,
     )
     return parser.parse_args()
 

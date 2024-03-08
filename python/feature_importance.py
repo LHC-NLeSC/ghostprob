@@ -6,12 +6,7 @@ import onnx2torch
 import matplotlib.pyplot as plt
 from captum import attr
 
-from utilities import (
-    load_data,
-    shuffle_data,
-    remove_nans,
-    normalize
-)
+from utilities import load_data, shuffle_data, remove_nans, normalize
 from networks import GhostNetwork, GhostNetworkWithNormalization
 from data import label, training_columns_forward, training_columns_matching
 
@@ -40,7 +35,11 @@ def command_line():
         action="store_true",
     )
     parser.add_argument(
-        "--track", help="Forward or Matching", type=str, choices=["forward", "matching"], required=True
+        "--track",
+        help="Forward or Matching",
+        type=str,
+        choices=["forward", "matching"],
+        required=True,
     )
     parser.add_argument("--int8", help="INT8 quantization.", action="store_true")
     return parser.parse_args()

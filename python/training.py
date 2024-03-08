@@ -11,7 +11,6 @@ from ray.tune.schedulers import ASHAScheduler
 
 from utilities import (
     GhostDataset,
-    QuietReporter,
     training_loop,
     inner_training_loop,
     testing_loop,

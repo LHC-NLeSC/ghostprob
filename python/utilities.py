@@ -3,7 +3,6 @@ import torch
 import numpy as np
 from torch.utils.data import Dataset, DataLoader
 from ray.air import Checkpoint, session
-from ray.tune import CLIReporter
 
 from networks import GhostNetwork, GhostNetworkWithNormalization
 
@@ -18,11 +17,6 @@ class GhostDataset(Dataset):
 
     def __getitem__(self, index):
         return self.data[index], self.labels[index]
-
-
-class QuietReporter(CLIReporter):
-    def should_report(self, trials, done=False):
-        return done
 
 
 def load_data(filename: str):

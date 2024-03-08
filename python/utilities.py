@@ -126,7 +126,7 @@ def testing_loop(device, model, dataloader, loss_function, threshold=0.5):
                 else:
                     prediction = prediction.squeeze(-1)
             loss = loss_function(prediction, y)
-            epoch_loss = epoch_loss + loss.item()
+            epoch_loss = epoch_loss + loss.cpu().numpy()
             accuracy = accuracy + ((prediction > threshold).float() == y).float().mean()
     epoch_loss = epoch_loss / steps
     accuracy = accuracy / len(dataloader)

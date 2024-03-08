@@ -1,24 +1,28 @@
 label = "ghost"
-training_columns = [
+
+training_columns_forward = [
     "best_pt",
     "chi2",
     "first_qop",
     "n_scifi",
-    "n_ut",
     "n_velo",
     "ndof",
     "pr_forward_quality",
+    "qop",
+]
+
+training_columns_matching = [
+    "best_pt",
+    "chi2",
+    "first_qop",
+    "n_scifi",
+    "n_velo",
+    "ndof",
     "pr_match_chi2",
     "pr_match_dtx",
     "pr_match_dty",
     "pr_match_dx",
     "pr_match_dy",
     "pr_seed_chi2",
-    "pr_velo_ut_chi2",
     "qop",
-    # "tx",
-    # "ty",
-    # "x",
-    # "y",
-    # "z",
 ]

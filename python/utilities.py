@@ -2,7 +2,7 @@ from ROOT import TFile, RDataFrame
 import torch
 import numpy as np
 from torch.utils.data import Dataset, DataLoader
-from ray.train import Checkpoint, session
+from ray.train import Checkpoint, get_checkpoint, report
 
 from networks import GhostNetwork, GhostNetworkWithNormalization
 
@@ -64,7 +64,7 @@ def training_loop(config):
     optimizer = select_optimizer(config, model)
     model.to(config["device"])
     # checkpointing
-    checkpoint = session.get_checkpoint()
+    checkpoint = get_checkpoint()
     if checkpoint:
         checkpoint_state = checkpoint.to_dict()
         start_epoch = checkpoint_state["epoch"]
@@ -94,7 +94,7 @@ def training_loop(config):
             "optimizer_state_dict": optimizer.state_dict(),
         }
         checkpoint = Checkpoint.from_dict(checkpoint_data)
-        session.report(
+        report(
             {"loss": loss, "accuracy": accuracy},
             checkpoint=checkpoint,
         )

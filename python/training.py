@@ -6,7 +6,7 @@ import torch
 from torch.utils.data import DataLoader
 from torch import nn
 import ray
-from ray import tune
+from ray import tune, train
 from ray.tune.schedulers import ASHAScheduler
 
 from utilities import (
@@ -147,6 +147,7 @@ def __main__():
         tune_config=tune.TuneConfig(
             scheduler=scheduler, num_samples=arguments.num_samples
         ),
+        run_config=train.RunConfig(storage_path="./ray_logs"),
         param_space=tuning_config,
     )
     result = tuner.fit()

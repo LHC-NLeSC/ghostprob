@@ -149,7 +149,7 @@ def __main__():
         tune_config=tune.TuneConfig(
             scheduler=scheduler, num_samples=arguments.num_samples
         ),
-        run_config=train.RunConfig(storage_path="/tmp/ghostbuster_ray_logs"),
+        run_config=train.RunConfig(storage_path="/tmp/ghostbuster_ray_logs", log_to_file=False),
         param_space=tuning_config,
     )
     result = tuner.fit()

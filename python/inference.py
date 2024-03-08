@@ -18,7 +18,7 @@ from utilities import (
     normalize,
 )
 from networks import GhostNetwork, GhostNetworkWithNormalization
-from data import label, training_columns
+from data import label, training_columns_forward, training_columns_matching
 
 thresholds = [
     0.1,
@@ -73,6 +73,9 @@ def command_line():
         help="Normalize input data before inference.",
         action="store_true",
     )
+    parser.add_argument(
+        "--track", help="Forward or Matching", type=str, choices=["forward", "matching"], required=True
+    )
     parser.add_argument("--network", help="Network to train", type=int, choices=range(0, 2), default=0)
     parser.add_argument("--int8", help="INT8 quantization.", action="store_true")
     return parser.parse_args()
@@ -93,6 +96,10 @@ def __main__():
             print("Missing labels.")
             return
         labels = dataframe[label].astype(int)
+        if arguments.track.lower() == "forward":
+            training_columns = training_columns_forward
+        elif arguments.track.lower() == "matching":
+            training_columns = training_columns_matching
         for column in training_columns:
             if column not in columns:
                 print("Missing data.")

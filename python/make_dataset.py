@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from utilities import load_data, shuffle_data, remove_nans, normalize
-from data import label, training_columns
+from data import label, training_columns_forward, training_columns_matching
 
 
 def command_line():
@@ -30,6 +30,9 @@ def command_line():
     parser.add_argument(
         "--normalize", help="Normalize features in [0, 1].", action="store_true"
     )
+    parser.add_argument(
+        "--track", help="Forward or Matching", type=str, choices=["forward", "matching"], required=True
+    )
     return parser.parse_args()
 
 
@@ -42,6 +45,10 @@ def __main__():
         print("Missing labels.")
         return
     labels = dataframe[label].astype(int)
+    if arguments.track.lower() == "forward":
+        training_columns = training_columns_forward
+    elif arguments.track.lower() == "matching":
+        training_columns = training_columns_matching
     for column in training_columns:
         if column not in columns:
             print("Missing training data.")

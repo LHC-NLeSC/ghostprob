@@ -10,9 +10,10 @@ from utilities import (
     load_data,
     shuffle_data,
     remove_nans,
+    normalize
 )
-from networks import GhostNetwork, GhostNetworkExperiment
-from data import label, training_columns
+from networks import GhostNetwork, GhostNetworkWithNormalization
+from data import label, training_columns_forward, training_columns_matching
 
 
 def command_line():
@@ -33,6 +34,14 @@ def command_line():
         type=str,
         required=True,
     )
+    parser.add_argument(
+        "--normalize",
+        help="Normalize input data before inference.",
+        action="store_true",
+    )
+    parser.add_argument(
+        "--track", help="Forward or Matching", type=str, choices=["forward", "matching"], required=True
+    )
     parser.add_argument("--int8", help="INT8 quantization.", action="store_true")
     return parser.parse_args()
 
@@ -52,6 +61,10 @@ def __main__():
             print("Missing labels.")
             return
         labels = dataframe[label].astype(int)
+        if arguments.track.lower() == "forward":
+            training_columns = training_columns_forward
+        elif arguments.track.lower() == "matching":
+            training_columns = training_columns_matching
         for column in training_columns:
             if column not in columns:
                 print("Missing data.")
@@ -60,6 +73,10 @@ def __main__():
         data = [dataframe[column] for column in training_columns]
         # Remove NaNs
         data, labels = remove_nans(data, labels)
+        # Normalize
+        if arguments.normalize:
+            for feature_id in range(len(data)):
+                data[feature_id] = normalize(data[feature_id])
         # split into ghost and real tracks
         data = np.hstack([data[i].reshape(len(data[0]), 1) for i in range(len(data))])
         data_ghost = data[labels == 1]

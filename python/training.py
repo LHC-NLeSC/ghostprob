@@ -153,7 +153,7 @@ def __main__():
         param_space=tuning_config,
     )
     result = tuner.fit()
-    best_trial = result.get_best_trial("loss", "min", "last")
+    best_trial = result.get_best_result("loss", "min", "last")
     print(f"Best trial config: {best_trial.config}")
     print(f"Best trial final validation loss: {best_trial.metrics['loss']}")
     print(f"Best trial final validation accuracy: {best_trial.metrics['accuracy']}")

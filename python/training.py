@@ -73,7 +73,7 @@ def __main__():
         configure_logging=False,
         log_to_driver=False,
         logging_level=logging.ERROR,
-        include_dashboard=False
+        include_dashboard=False,
     )
     # create training, validation, and testing data sets
     data_train = np.load(f"{arguments.filename}_train_data.npy")

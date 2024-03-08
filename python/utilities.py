@@ -2,7 +2,7 @@ from ROOT import TFile, RDataFrame
 import torch
 import numpy as np
 from torch.utils.data import Dataset, DataLoader
-from ray.train import Checkpoint, get_checkpoint, report
+from ray.train import report
 
 from networks import GhostNetwork, GhostNetworkWithNormalization
 
@@ -22,7 +22,6 @@ class GhostDataset(Dataset):
 def load_data(filename: str):
     kalman_file = TFile(filename)
     dataframe = RDataFrame("kalman_validator/kalman_ip_tree", kalman_file)
-    dataframe = dataframe.Define("p", "abs(1.f/best_qop)")
     return dataframe.AsNumpy(), dataframe.GetColumnNames()
 
 
@@ -63,15 +62,7 @@ def training_loop(config):
         )
     optimizer = select_optimizer(config, model)
     model.to(config["device"])
-    # checkpointing
-    checkpoint = get_checkpoint()
-    if checkpoint:
-        checkpoint_state = checkpoint.to_dict()
-        start_epoch = checkpoint_state["epoch"]
-        model.load_state_dict(checkpoint_state["net_state_dict"])
-        optimizer.load_state_dict(checkpoint_state["optimizer_state_dict"])
-    else:
-        start_epoch = 0
+    start_epoch = 0
     num_epochs = config["epochs"]
     for epoch in range(start_epoch, num_epochs):
         inner_training_loop(
@@ -88,16 +79,7 @@ def training_loop(config):
             config["loss_function"],
             config["threshold"],
         )
-        checkpoint_data = {
-            "epoch": epoch,
-            "net_state_dict": model.state_dict(),
-            "optimizer_state_dict": optimizer.state_dict(),
-        }
-        checkpoint = Checkpoint.from_dict(checkpoint_data)
-        report(
-            {"loss": loss, "accuracy": accuracy},
-            checkpoint=checkpoint,
-        )
+        report(metrics={"loss": loss, "accuracy": accuracy})
 
 
 def inner_training_loop(model, dataloader, device, optimizer, loss_function):

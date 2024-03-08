@@ -1,5 +1,4 @@
 import argparse
-from functools import partial
 import logging
 import pickle
 import numpy as np
@@ -107,7 +106,6 @@ def __main__():
         grace_period=2,
         reduction_factor=2,
     )
-    reporter = QuietReporter(metric_columns=["loss", "accuracy", "training_iteration"])
     loss_function = nn.BCELoss()
     # search space
     tuning_config = {

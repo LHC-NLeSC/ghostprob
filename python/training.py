@@ -138,7 +138,7 @@ def __main__():
     }
     if arguments.network == 1:
         tuning_config["normalization"] = tune.choice(
-            [nn.BatchNorm1d, nn.LazyBatchNorm1d, nn.SyncBatchNorm, nn.InstanceNorm1d]
+            [nn.BatchNorm1d, nn.LazyBatchNorm1d, nn.SyncBatchNorm]
         )
     tuner = tune.Tuner(
         tune.with_resources(

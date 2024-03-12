@@ -43,7 +43,7 @@ def command_line():
     )
     # misc
     parser.add_argument("--threshold", help="Ghost threshold.", type=float, default=0.5)
-    parser.add_argument("--batch", help="Batch size.", type=int, default=4096)
+    parser.add_argument("--batch", help="Batch size.", type=int, default=2048)
     parser.add_argument(
         "--cpu", help="Number of CPU cores to use for training.", type=int, default=1
     )

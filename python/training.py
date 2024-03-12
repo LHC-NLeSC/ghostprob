@@ -149,7 +149,9 @@ def __main__():
         tune_config=tune.TuneConfig(
             scheduler=scheduler, num_samples=arguments.num_samples
         ),
-        run_config=train.RunConfig(storage_path="/tmp/ghostbuster_ray_logs", log_to_file=False),
+        run_config=train.RunConfig(
+            storage_path="/tmp/ghostbuster_ray_logs", log_to_file=False
+        ),
         param_space=tuning_config,
     )
     result = tuner.fit()
@@ -201,7 +203,7 @@ def __main__():
         print("Saving model to ONNX format")
         dummy_input = torch.randn(int(best_trial.config["batch"]), num_features)
         dummy_input.to("cpu")
-        model_onnx = torch.onnx.export(model, dummy_input, "ghost_model.onnx")
+        torch.onnx.export(model, dummy_input, "ghost_model.onnx")
     # INT8 quantization
     if arguments.int8:
         print("INT8 quantization")

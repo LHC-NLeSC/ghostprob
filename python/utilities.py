@@ -110,15 +110,11 @@ def inner_training_loop(model, dataloader, device, optimizer, loss_function):
 
 
 def testing_loop(device, model, dataloader, loss_function, threshold=0.5):
-    batches = 0
-    elements = 0
     correct = 0
     epoch_loss = 0.0
     model.eval()
     with torch.no_grad():
         for x, y in dataloader:
-            batches += 1
-            elements += len(x)
             x = x.to(device)
             y = y.to(device)
             prediction = model(x)
@@ -130,8 +126,8 @@ def testing_loop(device, model, dataloader, loss_function, threshold=0.5):
             loss = loss_function(prediction, y)
             epoch_loss = epoch_loss + loss
             correct += ((prediction > threshold).int() == y).sum().item()
-    epoch_loss = float(epoch_loss / batches)
-    accuracy = float(correct / elements)
+    epoch_loss = float(epoch_loss / len(dataloader))
+    accuracy = float(correct / len(dataloader.dataset))
     return accuracy, epoch_loss
 
 

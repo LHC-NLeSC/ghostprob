@@ -150,7 +150,9 @@ def __main__():
             scheduler=scheduler, num_samples=arguments.num_samples
         ),
         run_config=train.RunConfig(
-            local_dir="/tmp/ghostbuster_ray_results", log_to_file=True
+            local_dir="/tmp/ghostbuster_ray_results",
+            storage_path="/tmp/ghostbuster_ray_results",
+            log_to_file=True,
         ),
         param_space=tuning_config,
     )

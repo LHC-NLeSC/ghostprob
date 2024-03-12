@@ -71,7 +71,7 @@ def __main__():
     ray.init(
         num_cpus=arguments.cpu,
         num_gpus=arguments.gpu,
-        configure_logging=False,
+        configure_logging=True,
         log_to_driver=False,
         logging_level=logging.ERROR,
         include_dashboard=False,
@@ -150,7 +150,7 @@ def __main__():
             scheduler=scheduler, num_samples=arguments.num_samples
         ),
         run_config=train.RunConfig(
-            storage_path="/tmp/ghostbuster_ray_logs", log_to_file=False
+            local_dir="/tmp/ghostbuster_ray_results", log_to_file=True
         ),
         param_space=tuning_config,
     )

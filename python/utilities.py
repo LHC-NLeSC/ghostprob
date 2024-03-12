@@ -128,8 +128,8 @@ def testing_loop(device, model, dataloader, loss_function, threshold=0.5):
             loss = loss_function(prediction, y)
             epoch_loss = epoch_loss + loss.cpu().numpy()
             accuracy = accuracy + ((prediction > threshold).float() == y).float().mean()
-    epoch_loss = epoch_loss / steps
-    accuracy = accuracy / len(dataloader)
+    epoch_loss = float(epoch_loss / steps)
+    accuracy = float(accuracy / len(dataloader))
     return accuracy, epoch_loss
 
 
@@ -173,9 +173,9 @@ def remove_nans(data, labels):
 
 
 def normalize(data: np.array) -> np.array:
-    min = np.min(data)
-    max = np.max(data)
+    minimum = np.min(data)
+    maximum = np.max(data)
     with np.errstate(divide="ignore"):
-        if np.isfinite(np.random.rand(1) / (max - min)):
-            return (data - min) / (max - min)
+        if np.isfinite(np.random.rand(1) / (maximum - minimum)):
+            return (data - minimum) / (maximum - minimum)
     return data

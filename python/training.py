@@ -43,6 +43,7 @@ def command_line():
     )
     # misc
     parser.add_argument("--threshold", help="Ghost threshold.", type=float, default=0.5)
+    parser.add_argument("--batch", help="Batch size.", type=int, default=4096)
     parser.add_argument(
         "--cpu", help="Number of CPU cores to use for training.", type=int, default=1
     )
@@ -116,7 +117,7 @@ def __main__():
             [i for i in range(int(num_features / 3), int(num_features * 3), 4)]
         ),
         "learning": tune.loguniform(1e-6, 1e-1),
-        "batch": tune.choice([2**i for i in range(1, 15)]),
+        "batch": arguments.batch,
         "epochs": num_epochs,
         "optimizer": tune.choice([0, 1]),
         "activation": tune.choice(
@@ -188,7 +189,7 @@ def __main__():
     )
     print()
     # test accuracy
-    test_dataloader = DataLoader(test_dataset, batch_size=best_trial.config["batch"])
+    test_dataloader = DataLoader(test_dataset, batch_size=arguments.batch)
     accuracy, loss = testing_loop(
         device, model, test_dataloader, loss_function, arguments.threshold
     )
@@ -203,7 +204,7 @@ def __main__():
         with open("ghost_model_config.pkl", "wb") as file:
             pickle.dump(best_trial.config, file)
         print("Saving model to ONNX format")
-        dummy_input = torch.randn(int(best_trial.config["batch"]), num_features)
+        dummy_input = torch.randn(arguments.batch, num_features)
         dummy_input.to("cpu")
         torch.onnx.export(model, dummy_input, "ghost_model.onnx")
     # INT8 quantization
@@ -214,9 +215,7 @@ def __main__():
         for _ in range(0, num_epochs):
             inner_training_loop(
                 model_prepared,
-                DataLoader(
-                    training_dataset, batch_size=int(best_trial.config["batch"])
-                ),
+                DataLoader(training_dataset, batch_size=arguments.batch),
                 "cpu",
                 select_optimizer(best_trial.config, model),
                 loss_function,

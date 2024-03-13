@@ -41,9 +41,15 @@ def command_line():
         type=int,
         default=128,
     )
-    # misc
     parser.add_argument("--threshold", help="Ghost threshold.", type=float, default=0.5)
     parser.add_argument("--batch", help="Batch size.", type=int, default=2048)
+    # misc
+    parser.add_argument(
+        "--path",
+        help="Where to store the tuning output.",
+        type=str,
+        default="/tmp/ghostprob/",
+    )
     parser.add_argument(
         "--cpu", help="Number of CPU cores to use for training.", type=int, default=1
     )
@@ -151,8 +157,8 @@ def __main__():
             scheduler=scheduler, num_samples=arguments.num_samples
         ),
         run_config=train.RunConfig(
-            local_dir="/tmp/ghostbuster_ray_results",
-            storage_path="/tmp/ghostbuster_ray_results",
+            local_dir=arguments.path,
+            storage_path=arguments.path,
             log_to_file=True,
         ),
         param_space=tuning_config,

@@ -212,7 +212,17 @@ def __main__():
         print("Saving model to ONNX format")
         dummy_input = torch.randn(arguments.batch, num_features)
         dummy_input.to("cpu")
-        torch.onnx.export(model, dummy_input, "ghost_model.onnx")
+        torch.onnx.export(
+            model,
+            dummy_input,
+            "ghost_model.onnx",
+            input_names=["input"],
+            output_names=["probabilities"],
+            dynamic_axes={
+                "input": {0: "batch_size", 1: "num_features"},
+                "output": {0: "batch_size"},
+            },
+        )
     # INT8 quantization
     if arguments.int8:
         print("INT8 quantization")

@@ -216,11 +216,11 @@ def __main__():
             model,
             dummy_input,
             "ghost_model.onnx",
-            input_names=["input"],
+            input_names=["features"],
             output_names=["probabilities"],
             dynamic_axes={
-                "input": {0: "batch_size", 1: "num_features"},
-                "output": {0: "batch_size"},
+                "features": {0: "batch_size", 1: "num_features"},
+                "probabilities": {0: "batch_size"},
             },
         )
     # INT8 quantization

@@ -219,7 +219,7 @@ def __main__():
             input_names=["features"],
             output_names=["probabilities"],
             dynamic_axes={
-                "features": {0: "batch_size", 1: num_features},
+                "features": {0: "batch_size"},
                 "probabilities": {0: "batch_size"},
             },
         )

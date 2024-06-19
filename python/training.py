@@ -17,7 +17,7 @@ from utilities import (
     testing_loop,
     select_optimizer,
 )
-from networks import GhostNetwork, GhostNetworkWithNormalization
+from networks import GhostNetwork, GhostNetworkWithNormalization, GhostNetworkWithManualNormalization
 
 
 def command_line():
@@ -31,7 +31,7 @@ def command_line():
     )
     # parameters
     parser.add_argument(
-        "--network", help="Network to train", type=int, choices=range(0, 2), default=0
+        "--network", help="Network to train", type=int, choices=range(0, 3), default=0
     )
     parser.add_argument("--epochs", help="Number of epochs", type=int, default=256)
     parser.add_argument(
@@ -186,6 +186,12 @@ def __main__():
             activation=best_trial.config["activation"],
             normalization=best_trial.config["normalization"],
         )
+    elif arguments.network == 2:
+        model = GhostNetworkWithManualNormalization(num_features,
+            l0=best_trial.config["l0"],
+            matching=True,
+            activation=best_trial.config["activation"],
+                                                    )
     model.load_state_dict(model_state)
     model.to(device)
     print()

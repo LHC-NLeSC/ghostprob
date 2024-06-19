@@ -6,7 +6,7 @@ import numpy as np
 from torch.utils.data import Dataset, DataLoader
 from ray import train
 
-from networks import GhostNetwork, GhostNetworkWithNormalization
+from networks import GhostNetwork, GhostNetworkWithNormalization, GhostNetworkWithManualNormalization
 
 
 class GhostDataset(Dataset):
@@ -61,6 +61,13 @@ def training_loop(config):
             l0=config["l0"],
             activation=config["activation"],
             normalization=config["normalization"],
+        )
+    elif config["network"] == 2:
+        model = GhostNetworkWithManualNormalization(
+            config["num_features"],
+            l0=config["l0"],
+            matching=True,
+            activation=config["activation"],
         )
     optimizer = select_optimizer(config, model)
     model.to(config["device"])

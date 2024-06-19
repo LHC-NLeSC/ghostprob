@@ -17,7 +17,7 @@ from utilities import (
     testing_accuracy,
     normalize,
 )
-from networks import GhostNetwork, GhostNetworkWithNormalization
+from networks import GhostNetwork, GhostNetworkWithNormalization, GhostNetworkWithManualNormalization
 from data import label, training_columns_forward, training_columns_matching
 
 thresholds = [
@@ -81,7 +81,7 @@ def command_line():
         required=True,
     )
     parser.add_argument(
-        "--network", help="Network to train", type=int, choices=range(0, 2), default=0
+        "--network", help="Network to train", type=int, choices=range(0, 3), default=0
     )
     parser.add_argument("--int8", help="INT8 quantization.", action="store_true")
     return parser.parse_args()
@@ -156,6 +156,13 @@ def __main__():
                     l0=model_config["l0"],
                     activation=model_config["activation"],
                     normalization=model_config["normalization"],
+                )
+            elif arguments.network == 2:
+                model = GhostNetworkWithManualNormalization(
+                    num_features,
+                    l0=model_config["l0"],
+                    matching=True,
+                    activation=model_config["activation"],
                 )
             weights = torch.load(arguments.model)
             model.load_state_dict(weights)

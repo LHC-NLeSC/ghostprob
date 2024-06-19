@@ -17,7 +17,11 @@ from utilities import (
     testing_loop,
     select_optimizer,
 )
-from networks import GhostNetwork, GhostNetworkWithNormalization, GhostNetworkWithManualNormalization
+from networks import (
+    GhostNetwork,
+    GhostNetworkWithNormalization,
+    GhostNetworkWithManualNormalization,
+)
 
 
 def command_line():
@@ -187,11 +191,12 @@ def __main__():
             normalization=best_trial.config["normalization"],
         )
     elif arguments.network == 2:
-        model = GhostNetworkWithManualNormalization(num_features,
+        model = GhostNetworkWithManualNormalization(
+            num_features,
             l0=best_trial.config["l0"],
             matching=True,
             activation=best_trial.config["activation"],
-                                                    )
+        )
     model.load_state_dict(model_state)
     model.to(device)
     print()

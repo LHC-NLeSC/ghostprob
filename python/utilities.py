@@ -6,7 +6,11 @@ import numpy as np
 from torch.utils.data import Dataset, DataLoader
 from ray import train
 
-from networks import GhostNetwork, GhostNetworkWithNormalization, GhostNetworkWithManualNormalization
+from networks import (
+    GhostNetwork,
+    GhostNetworkWithNormalization,
+    GhostNetworkWithManualNormalization,
+)
 
 
 class GhostDataset(Dataset):

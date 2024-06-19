@@ -17,7 +17,11 @@ from utilities import (
     testing_accuracy,
     normalize,
 )
-from networks import GhostNetwork, GhostNetworkWithNormalization, GhostNetworkWithManualNormalization
+from networks import (
+    GhostNetwork,
+    GhostNetworkWithNormalization,
+    GhostNetworkWithManualNormalization,
+)
 from data import label, training_columns_forward, training_columns_matching
 
 thresholds = [

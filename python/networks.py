@@ -46,18 +46,12 @@ class GhostNetworkWithNormalization(nn.Module):
         return x
 
 
-class GhostNetworkWithManualNormalization(nn.Module):
-    def __init__(self, num_features, l0=32, matching=True, activation=nn.ReLU):
-        super(GhostNetworkWithManualNormalization, self).__init__()
+class NormalizationLayer(nn.Module):
+    def __init__(self, matching: bool = True):
+        super(NormalizationLayer, self).__init__()
         self.matching = matching
-        self.quant = torch.quantization.QuantStub()
-        self.layer0 = nn.Linear(num_features, l0)
-        self.activation = activation()
-        self.output = nn.Linear(l0, 1)
-        self.sigmoid = nn.Sigmoid()
-        self.dequant = torch.quantization.DeQuantStub()
 
-    def normalization(self, x):
+    def forward(self, x):
         if self.matching:
             x[:, 0] = (x[:, 0] - 12.615314483642578) / 155663427.38468552
             x[:, 1] = x[:, 1] / 25787.57421875
@@ -75,6 +69,19 @@ class GhostNetworkWithManualNormalization(nn.Module):
         else:
             pass
         return x
+
+
+class GhostNetworkWithManualNormalization(nn.Module):
+    def __init__(self, num_features, l0=32, matching=True, activation=nn.ReLU):
+        super(GhostNetworkWithManualNormalization, self).__init__()
+        self.matching = matching
+        self.normalization = NormalizationLayer(matching)
+        self.quant = torch.quantization.QuantStub()
+        self.layer0 = nn.Linear(num_features, l0)
+        self.activation = activation()
+        self.output = nn.Linear(l0, 1)
+        self.sigmoid = nn.Sigmoid()
+        self.dequant = torch.quantization.DeQuantStub()
 
     def forward(self, x):
         x = self.quant(x)

@@ -75,8 +75,8 @@ class GhostNetworkWithManualNormalization(nn.Module):
     def __init__(self, num_features, l0=32, matching=True, activation=nn.ReLU):
         super(GhostNetworkWithManualNormalization, self).__init__()
         self.matching = matching
-        self.normalization = NormalizationLayer(matching)
         self.quant = torch.quantization.QuantStub()
+        self.normalization = NormalizationLayer(matching)
         self.layer0 = nn.Linear(num_features, l0)
         self.activation = activation()
         self.output = nn.Linear(l0, 1)

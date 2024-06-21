@@ -137,7 +137,6 @@ def __main__():
                 nn.Sigmoid,
                 nn.LeakyReLU,
                 nn.ELU,
-                nn.LogSigmoid,
                 nn.Softmax,
                 nn.Softmin,
             ]

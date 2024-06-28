@@ -31,6 +31,10 @@ def load_data(filename: str):
     return dataframe.AsNumpy(), dataframe.GetColumnNames()
 
 
+def save_data(filename: str):
+    pass
+
+
 def shuffle_data(rng, data, labels):
     assert len(data) == len(labels)
     permutation = rng.permutation(len(data))
@@ -72,10 +76,10 @@ def training_loop(config):
             l0=config["l0"],
             matching=True,
             activation=config["activation"],
-            device=config["device"]
+            device=config["device"],
         )
     optimizer = select_optimizer(config, model)
-    model.to(config["device"])
+    model = model.to(config["device"])
     if train.get_checkpoint():
         loaded_checkpoint = train.get_checkpoint()
         with loaded_checkpoint.as_directory() as loaded_checkpoint_dir:

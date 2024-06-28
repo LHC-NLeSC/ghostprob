@@ -195,10 +195,10 @@ def __main__():
             l0=best_trial.config["l0"],
             matching=True,
             activation=best_trial.config["activation"],
-            device=device
+            device=device,
         )
     model.load_state_dict(model_state)
-    model.to(device)
+    model = model.to(device)
     print()
     print(model)
     print(
@@ -216,13 +216,16 @@ def __main__():
     # save model
     if arguments.save:
         print("Saving model to disk")
-        model.to("cpu")
+        model = model.to("cpu")
+        if arguments.network == 2:
+            model.normalization.shift = model.normalization.shift.to("cpu")
+            model.normalization.scale = model.normalization.scale.to("cpu")
         torch.save(model.state_dict(), "ghost_model.pth")
         with open("ghost_model_config.pkl", "wb") as file:
             pickle.dump(best_trial.config, file)
         print("Saving model to ONNX format")
         dummy_input = torch.randn(arguments.batch, num_features)
-        dummy_input.to("cpu")
+        dummy_input = dummy_input.to("cpu")
         torch.onnx.export(
             model,
             dummy_input,
@@ -258,8 +261,8 @@ def __main__():
             torch.save(model_int8, "ghost_model_int8.pth")
             print("Saving INT8 model to ONNX format")
             dummy_input = torch.randn(1, num_features)
-            dummy_input.to("cpu")
-            model_int8.to("cpu")
+            dummy_input = dummy_input.to("cpu")
+            model_int8 = model_int8.to("cpu")
             torch.onnx.export(
                 model_int8, dummy_input, "ghost_model_int8.onnx", export_params=True
             )

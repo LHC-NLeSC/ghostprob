@@ -47,7 +47,9 @@ class GhostNetworkWithNormalization(nn.Module):
 
 
 class NormalizationLayer(nn.Module):
-    def __init__(self, matching: bool = True, device: torch.device = torch.device("cpu")):
+    def __init__(
+        self, matching: bool = True, device: torch.device = torch.device("cpu")
+    ):
         super(NormalizationLayer, self).__init__()
         self.matching = matching
         if matching:
@@ -66,7 +68,9 @@ class NormalizationLayer(nn.Module):
                     -149.963134765625,
                     0.004197417292743921,
                     -0.0004279722925275564,
-                ], dtype=torch.float32, device=device
+                ],
+                dtype=torch.float32,
+                device=device,
             )
             self.scale = torch.tensor(
                 [
@@ -83,9 +87,10 @@ class NormalizationLayer(nn.Module):
                     299.958740234375,
                     1301.8299090280198,
                     0.0007813300180714577,
-                ], dtype=torch.float32, device=device
+                ],
+                dtype=torch.float32,
+                device=device,
             )
-
 
     def forward(self, x):
         if self.matching:
@@ -94,7 +99,14 @@ class NormalizationLayer(nn.Module):
 
 
 class GhostNetworkWithManualNormalization(nn.Module):
-    def __init__(self, num_features, l0=32, matching=True, activation=nn.ReLU, device: torch.device = torch.device("cpu")):
+    def __init__(
+        self,
+        num_features,
+        l0=32,
+        matching=True,
+        activation=nn.ReLU,
+        device: torch.device = torch.device("cpu"),
+    ):
         super(GhostNetworkWithManualNormalization, self).__init__()
         self.matching = matching
         self.quant = torch.quantization.QuantStub()

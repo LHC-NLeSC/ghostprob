@@ -115,7 +115,7 @@ def __main__():
             )
             weights = torch.load(arguments.model)
             model.load_state_dict(weights)
-    model.to(device)
+    model = model.to(device)
     print()
     print(model)
     print()

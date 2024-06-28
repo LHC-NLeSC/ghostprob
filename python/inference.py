@@ -167,6 +167,7 @@ def __main__():
                     l0=model_config["l0"],
                     matching=True,
                     activation=model_config["activation"],
+                    device=device
                 )
             weights = torch.load(arguments.model)
             model.load_state_dict(weights)

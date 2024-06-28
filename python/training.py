@@ -195,6 +195,7 @@ def __main__():
             l0=best_trial.config["l0"],
             matching=True,
             activation=best_trial.config["activation"],
+            device=device
         )
     model.load_state_dict(model_state)
     model.to(device)

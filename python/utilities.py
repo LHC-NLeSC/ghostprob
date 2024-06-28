@@ -72,6 +72,7 @@ def training_loop(config):
             l0=config["l0"],
             matching=True,
             activation=config["activation"],
+            device=config["device"]
         )
     optimizer = select_optimizer(config, model)
     model.to(config["device"])

@@ -139,9 +139,11 @@ def __main__():
     test_dataloader = DataLoader(
         test_dataset, batch_size=model_config["batch"], shuffle=True
     )
-    loss_function = nn.BCELoss()
     # Run inference and return probabilities
     probabilities = infer_probabilities(device, model, test_dataloader)
+    print(f"Entries: {len(probabilities)}")
+    print(f"Mean: {np.mean(probabilities)}")
+    print(f"Std Dev: {np.std(probabilities)}")
     # Plot histogram of probabilities
     counts, bins = np.histogram(probabilities)
     plt.stairs(counts, bins, fill=True)

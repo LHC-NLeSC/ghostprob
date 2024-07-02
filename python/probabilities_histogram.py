@@ -106,35 +106,32 @@ def __main__():
     num_features = data.shape[1]
     with open(arguments.config, "rb") as file:
         model_config = pickle.load(file)
-    if arguments.int8:
-        model = torch.load(arguments.model)
+    if "onnx" in arguments.model:
+        model = onnx2torch.convert(arguments.model)
     else:
-        if "onnx" in arguments.model:
-            model = onnx2torch.convert(arguments.model)
-        else:
-            if arguments.network == 0:
-                model = GhostNetwork(
-                    num_features,
-                    l0=model_config["l0"],
-                    activation=model_config["activation"],
-                )
-            elif arguments.network == 1:
-                model = GhostNetworkWithNormalization(
-                    num_features,
-                    l0=model_config["l0"],
-                    activation=model_config["activation"],
-                    normalization=model_config["normalization"],
-                )
-            elif arguments.network == 2:
-                model = GhostNetworkWithManualNormalization(
-                    num_features,
-                    l0=model_config["l0"],
-                    matching=True,
-                    activation=model_config["activation"],
-                    device=device,
-                )
-            weights = torch.load(arguments.model)
-            model.load_state_dict(weights)
+        if arguments.network == 0:
+            model = GhostNetwork(
+                num_features,
+                l0=model_config["l0"],
+                activation=model_config["activation"],
+            )
+        elif arguments.network == 1:
+            model = GhostNetworkWithNormalization(
+                num_features,
+                l0=model_config["l0"],
+                activation=model_config["activation"],
+                normalization=model_config["normalization"],
+            )
+        elif arguments.network == 2:
+            model = GhostNetworkWithManualNormalization(
+                num_features,
+                l0=model_config["l0"],
+                matching=True,
+                activation=model_config["activation"],
+                device=device,
+            )
+        weights = torch.load(arguments.model)
+        model.load_state_dict(weights)
     model = model.to(device)
     print()
     print(model)

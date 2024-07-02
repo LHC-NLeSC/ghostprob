@@ -180,8 +180,9 @@ def infer_probabilities(device, model, dataloader):
         for x, y in dataloader:
             x = x.to(device)
             y = y.to(device)
-            prediction = model(x)
-            probabilities.append(prediction)
+            prediction = model(x).cpu()
+            for probability in prediction:
+                probabilities.append(probability)
     return probabilities
 
 

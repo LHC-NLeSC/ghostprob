@@ -173,6 +173,18 @@ def testing_accuracy(device, model, dataloader, threshold):
     return accuracy
 
 
+def infer_probabilities(device, model, dataloader):
+    probabilities = list()
+    model.eval()
+    with torch.no_grad():
+        for x, y in dataloader:
+            x = x.to(device)
+            y = y.to(device)
+            prediction = model(x)
+            probabilities.append(prediction)
+    return probabilities
+
+
 def remove_nans(data, labels):
     corrected_columns = 0
     for _, column in enumerate(data):

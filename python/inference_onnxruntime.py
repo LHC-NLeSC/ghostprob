@@ -52,12 +52,6 @@ def command_line():
         required=True,
     )
     parser.add_argument(
-        "--config",
-        help="Name of the file containing the model configuration.",
-        type=str,
-        required=True,
-    )
-    parser.add_argument(
         "--normalize",
         help="Normalize input data before inference.",
         action="store_true",
@@ -69,9 +63,7 @@ def command_line():
         choices=["forward", "matching"],
         required=True,
     )
-    parser.add_argument(
-        "--network", help="Network to use", type=int, choices=range(0, 3), default=0
-    )
+    parser.add_argument("--batch", help="Batch size", type=int, default=1)
     return parser.parse_args()
 
 
@@ -118,13 +110,11 @@ def __main__():
         torch.tensor(labels, dtype=torch.float32),
     )
     # read model and initialize ONNXRuntime
-    with open(arguments.config, "rb") as file:
-        model_config = pickle.load(file)
     ort_session = ort.InferenceSession(arguments.model)
     input_name = ort_session.get_inputs()[0].name
     output_name = ort_session.get_outputs()[0].name
     test_dataloader = DataLoader(
-        test_dataset, batch_size=model_config["batch"], shuffle=True
+        test_dataset, batch_size=arguments.batch, shuffle=True
     )
     # Accuracy test (CLI)
     accuracies = list()
@@ -132,7 +122,7 @@ def __main__():
         start_time = perf_counter()
         accuracy = [0, 0]
         for x, y in test_dataloader:
-            prediction = ort_session.run(None, {input_name: [x.numpy()]})[0][0]
+            prediction = ort_session.run([output_name], {input_name: [x.numpy()]})[0][0]
             prediction = (prediction > threshold).int()
             for i in range(0, len(prediction)):
                 # True Positive
@@ -166,7 +156,7 @@ def __main__():
     for threshold in thresholds:
         accuracy = [0, 0, 0, 0]
         for x, y in test_dataloader:
-            prediction = ort_session.run(None, {input_name: [x.numpy()]})[0][0][0]
+            prediction = ort_session.run([output_name], {input_name: [x.numpy()]})[0][0][0]
             prediction = (prediction > threshold).int()
             for i in range(0, len(prediction)):
                 # True Positive

@@ -7,7 +7,7 @@ from torch.utils.data import DataLoader
 import onnxruntime as ort
 import matplotlib.pyplot as plt
 
-from utilities import load_data, remove_nans, shuffle_data, GhostDataset
+from utilities import load_data, remove_nans, shuffle_data, GhostDataset, normalize
 from data import label, training_columns_forward, training_columns_matching
 
 thresholds = [
@@ -114,8 +114,8 @@ def __main__():
     p_ghosts = dict(zip(values, counts))[1] / tracks
     p_real = dict(zip(values, counts))[0] / tracks
     test_dataset = GhostDataset(
-        torch.tensor(data, dtype=torch.float32, device=device),
-        torch.tensor(labels, dtype=torch.float32, device=device),
+        torch.tensor(data, dtype=torch.float32),
+        torch.tensor(labels, dtype=torch.float32),
     )
     # read model and initialize ONNXRuntime
     with open(arguments.config, "rb") as file:
@@ -166,9 +166,7 @@ def __main__():
     for threshold in thresholds:
         accuracy = [0, 0, 0, 0]
         for x, y in test_dataloader:
-            prediction = ort_session.run(None, {input_name: [x.numpy()]})[0][
-                0
-            ][0]
+            prediction = ort_session.run(None, {input_name: [x.numpy()]})[0][0][0]
             prediction = (prediction > threshold).int()
             for i in range(0, len(prediction)):
                 # True Positive

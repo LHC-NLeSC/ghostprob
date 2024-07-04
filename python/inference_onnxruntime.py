@@ -113,29 +113,27 @@ def __main__():
     ort_session = ort.InferenceSession(arguments.model)
     input_name = ort_session.get_inputs()[0].name
     output_name = ort_session.get_outputs()[0].name
-    test_dataloader = DataLoader(
-        test_dataset, batch_size=arguments.batch, shuffle=True
-    )
+    test_dataloader = DataLoader(test_dataset, batch_size=arguments.batch, shuffle=True)
     # Accuracy test (CLI)
     accuracies = list()
     for threshold in thresholds:
         start_time = perf_counter()
         accuracy = [0, 0]
         for x, y in test_dataloader:
-            prediction = ort_session.run([output_name], {input_name: [x.numpy()]})[0][0]
-            prediction = (prediction > threshold).int()
+            prediction = ort_session.run([output_name], {input_name: x.numpy()})[0]
+            prediction = prediction > threshold
             for i in range(0, len(prediction)):
                 # True Positive
-                if prediction[i] == 1 and y.int()[i] == 1:
+                if prediction[i] and y.int()[i] == 1:
                     accuracy[0] += 1
                 # True Negative
-                elif prediction[i] == 0 and y.int()[i] == 0:
+                elif not prediction[i] and y.int()[i] == 0:
                     accuracy[1] += 1
-        temp_accuracy = (accuracy[0] + accuracy[1]) / (np.sum(accuracy)) * 100
+        temp_accuracy = ((accuracy[0] + accuracy[1]) * 100) / len(data)
         end_time = perf_counter()
         accuracies.append(temp_accuracy)
         print(f"Threshold: {threshold}")
-        print(f"\tAccuracy: {temp_accuracy * 100.0:.2f}%")
+        print(f"\tAccuracy: {temp_accuracy:.2f}%")
         print(f"\tInference time: {end_time - start_time:.2f} seconds")
         print()
     print(f"Tracks: {p_real * 100.0:.2f}%")
@@ -156,20 +154,20 @@ def __main__():
     for threshold in thresholds:
         accuracy = [0, 0, 0, 0]
         for x, y in test_dataloader:
-            prediction = ort_session.run([output_name], {input_name: [x.numpy()]})[0][0][0]
-            prediction = (prediction > threshold).int()
+            prediction = ort_session.run([output_name], {input_name: x.numpy()})[0]
+            prediction = prediction > threshold
             for i in range(0, len(prediction)):
                 # True Positive
-                if prediction[i] == 1 and y.int()[i] == 1:
+                if prediction[i] and y.int()[i] == 1:
                     accuracy[0] += 1
                 # True Negative
-                elif prediction[i] == 0 and y.int()[i] == 0:
+                elif not prediction[i] and y.int()[i] == 0:
                     accuracy[1] += 1
                 # False Positive
-                elif prediction[i] == 1 and y.int()[i] == 0:
+                elif prediction[i] and y.int()[i] == 0:
                     accuracy[2] += 1
                 # False Negative
-                elif prediction[i] == 0 and y.int()[i] == 1:
+                elif not prediction[i] and y.int()[i] == 1:
                     accuracy[3] += 1
         tp.append(accuracy[0])
         tn.append(accuracy[1])

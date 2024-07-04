@@ -1,5 +1,4 @@
 import argparse
-import pickle
 from time import perf_counter
 import numpy as np
 import torch

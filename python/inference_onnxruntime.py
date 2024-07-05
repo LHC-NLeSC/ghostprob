@@ -142,7 +142,7 @@ def __main__():
     plt.plot(thresholds, accuracies, label="Accuracy")
     plt.xlabel("Threshold")
     plt.xticks(thresholds)
-    plt.ylim(0, 1)
+    plt.ylim(0, 100)
     plt.legend()
     plt.show()
     # Plot accuracy components

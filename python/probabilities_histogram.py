@@ -102,10 +102,16 @@ def __main__():
         data = np.load(f"{arguments.filename}_test_data.npy")
         labels = np.load(f"{arguments.filename}_test_labels.npy")
         print(f"Test set size: {len(data)}")
-    test_dataset = GhostDataset(
-        torch.tensor(data, dtype=torch.float32, device=device),
-        torch.tensor(labels, dtype=torch.float32, device=device),
-    )
+    if arguments.ort:
+        test_dataset = GhostDataset(
+            torch.tensor(data, dtype=torch.float32),
+            torch.tensor(labels, dtype=torch.float32),
+        )
+    else:
+        test_dataset = GhostDataset(
+            torch.tensor(data, dtype=torch.float32, device=device),
+            torch.tensor(labels, dtype=torch.float32, device=device),
+        )
     # read model
     with open(arguments.config, "rb") as file:
         model_config = pickle.load(file)

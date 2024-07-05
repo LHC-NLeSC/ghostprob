@@ -186,6 +186,17 @@ def infer_probabilities(device, model, dataloader):
     return probabilities
 
 
+def infer_probabilities_ort(ort_session, dataloader):
+    probabilities = list()
+    input_name = ort_session.get_inputs()[0].name
+    output_name = ort_session.get_outputs()[0].name
+    for x, y in dataloader:
+        prediction = ort_session.run([output_name], {input_name: x.numpy()})[0]
+        for probability in prediction:
+            probabilities.append(probability)
+    return probabilities
+
+
 def remove_nans(data, labels):
     corrected_columns = 0
     for _, column in enumerate(data):

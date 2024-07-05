@@ -5,6 +5,7 @@ import torch
 from torch import nn
 from torch.utils.data import DataLoader
 import onnx2torch
+import onnxruntime as ort
 import matplotlib.pyplot as plt
 
 from utilities import (
@@ -14,6 +15,7 @@ from utilities import (
     remove_nans,
     normalize,
     infer_probabilities,
+    infer_probabilities_ort,
 )
 from networks import (
     GhostNetwork,
@@ -56,16 +58,18 @@ def command_line():
     parser.add_argument(
         "--network", help="Network to use", type=int, choices=range(0, 3), default=0
     )
+    parser.add_argument("--ort", help="Enable ONNX Runtime.", action="store_true")
     return parser.parse_args()
 
 
 def __main__():
     arguments = command_line()
-    if not arguments.nocuda and torch.cuda.is_available():
-        device = torch.device("cuda")
-    else:
-        device = torch.device("cpu")
-    print(f"Device: {device}")
+    if not arguments.ort:
+        if not arguments.nocuda and torch.cuda.is_available():
+            device = torch.device("cuda")
+        else:
+            device = torch.device("cpu")
+        print(f"Device: {device}")
     if ".root" in arguments.filename:
         dataframe, columns = load_data(arguments.filename)
         print(f"Columns in the table: {len(dataframe)}")
@@ -103,44 +107,50 @@ def __main__():
         torch.tensor(labels, dtype=torch.float32, device=device),
     )
     # read model
-    num_features = data.shape[1]
     with open(arguments.config, "rb") as file:
         model_config = pickle.load(file)
-    if "onnx" in arguments.model:
-        model = onnx2torch.convert(arguments.model)
+    if arguments.ort:
+        ort_session = ort.InferenceSession(arguments.model)
     else:
-        if arguments.network == 0:
-            model = GhostNetwork(
-                num_features,
-                l0=model_config["l0"],
-                activation=model_config["activation"],
-            )
-        elif arguments.network == 1:
-            model = GhostNetworkWithNormalization(
-                num_features,
-                l0=model_config["l0"],
-                activation=model_config["activation"],
-                normalization=model_config["normalization"],
-            )
-        elif arguments.network == 2:
-            model = GhostNetworkWithManualNormalization(
-                num_features,
-                l0=model_config["l0"],
-                matching=True,
-                activation=model_config["activation"],
-                device=device,
-            )
-        weights = torch.load(arguments.model)
-        model.load_state_dict(weights)
-    model = model.to(device)
-    print()
-    print(model)
-    print()
+        num_features = data.shape[1]
+        if "onnx" in arguments.model:
+            model = onnx2torch.convert(arguments.model)
+        else:
+            if arguments.network == 0:
+                model = GhostNetwork(
+                    num_features,
+                    l0=model_config["l0"],
+                    activation=model_config["activation"],
+                )
+            elif arguments.network == 1:
+                model = GhostNetworkWithNormalization(
+                    num_features,
+                    l0=model_config["l0"],
+                    activation=model_config["activation"],
+                    normalization=model_config["normalization"],
+                )
+            elif arguments.network == 2:
+                model = GhostNetworkWithManualNormalization(
+                    num_features,
+                    l0=model_config["l0"],
+                    matching=True,
+                    activation=model_config["activation"],
+                    device=device,
+                )
+            weights = torch.load(arguments.model)
+            model.load_state_dict(weights)
+        model = model.to(device)
+        print()
+        print(model)
+        print()
     test_dataloader = DataLoader(
         test_dataset, batch_size=model_config["batch"], shuffle=True
     )
     # Run inference and return probabilities
-    probabilities = infer_probabilities(device, model, test_dataloader)
+    if arguments.ort:
+        probabilities = infer_probabilities_ort(ort_session, test_dataloader)
+    else:
+        probabilities = infer_probabilities(device, model, test_dataloader)
     print(f"Entries: {len(probabilities)}")
     print(f"Mean: {np.mean(probabilities)}")
     print(f"Std Dev: {np.std(probabilities)}")

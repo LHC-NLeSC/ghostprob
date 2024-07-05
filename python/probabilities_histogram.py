@@ -155,7 +155,7 @@ def __main__():
     print(f"Mean: {np.mean(probabilities)}")
     print(f"Std Dev: {np.std(probabilities)}")
     # Plot histogram of probabilities
-    counts, bins = np.histogram(probabilities)
+    counts, bins = np.histogram(probabilities, bins=50)
     plt.stairs(counts, bins, fill=True)
     plt.show()
 

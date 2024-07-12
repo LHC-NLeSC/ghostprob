@@ -1,7 +1,8 @@
 torch
 onnx
 onnx2torch
-numpy
+onnxruntime
+numpy<2.0
 ROOT
 ray
 pandas

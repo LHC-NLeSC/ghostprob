@@ -50,6 +50,22 @@ def select_optimizer(config, model):
 
 
 def training_loop(config):
+    if config['use_cuda']:
+        device = torch.device(f"cuda:0")
+    else:
+        device = torch.device("cpu")
+
+    data_train, labels_train = config['training_dataset']
+    training_dataset = GhostDataset(
+        torch.tensor(data_train, dtype=torch.float32, device=device),
+        torch.tensor(labels_train, dtype=torch.float32, device=device),
+    )
+    data_validation, labels_validation = config['validation_dataset']
+    validation_dataset = GhostDataset(
+        torch.tensor(data_validation, dtype=torch.float32, device=device),
+        torch.tensor(labels_validation, dtype=torch.float32, device=device),
+    )
+
     training_dataloader = DataLoader(
         config["training_dataset"], batch_size=int(config["batch"])
     )
@@ -79,7 +95,7 @@ def training_loop(config):
             device=config["device"],
         )
     optimizer = select_optimizer(config, model)
-    model = model.to(config["device"])
+    model = model.to(device)
     if train.get_checkpoint():
         loaded_checkpoint = train.get_checkpoint()
         with loaded_checkpoint.as_directory() as loaded_checkpoint_dir:

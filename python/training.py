@@ -55,6 +55,12 @@ def command_line():
         default="/tmp/ghostprob/",
     )
     parser.add_argument(
+        "--tmp-path",
+        help="Where to store the tuning output.",
+        type=str,
+        default="/tmp/ray/",
+    )
+    parser.add_argument(
         "--cpu", help="Number of CPU cores to use for training.", type=int, default=1
     )
     parser.add_argument("--nocuda", help="Disable CUDA", action="store_true")
@@ -86,6 +92,7 @@ def __main__():
         log_to_driver=False,
         logging_level=logging.ERROR,
         include_dashboard=False,
+        _temp_dir=arguments.tmp_path
     )
     # create training, validation, and testing data sets
     data_train = np.load(f"{arguments.filename}_train_data.npy")
@@ -160,7 +167,6 @@ def __main__():
             scheduler=scheduler, num_samples=arguments.num_samples
         ),
         run_config=train.RunConfig(
-            local_dir=arguments.path,
             storage_path=arguments.path,
             log_to_file=True,
         ),

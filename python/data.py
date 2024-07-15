@@ -26,3 +26,6 @@ training_columns_matching = [
     "pr_seed_chi2",
     "qop",
 ]
+
+boundaries = {"best_pt": (0, 1e4),
+              "chi2": (0, 400)}

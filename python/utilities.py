@@ -210,9 +210,12 @@ def remove_nans(data, labels):
     return data, labels
 
 
-def normalize(data: np.array) -> np.array:
-    minimum = np.min(data)
-    maximum = np.max(data)
+def normalize(data, min_max=None) -> np.array:
+    if min_max is None:
+        minimum = np.min(data)
+        maximum = np.max(data)
+    else:
+        minimum, maximum = min_max
     with np.errstate(divide="ignore"):
         if np.isfinite(np.random.rand(1) / (maximum - minimum)):
             return (data - minimum) / (maximum - minimum)

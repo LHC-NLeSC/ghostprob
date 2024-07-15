@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from utilities import load_data, shuffle_data, remove_nans, normalize
-from data import label, training_columns_forward, training_columns_matching
+from data import label, training_columns_forward, training_columns_matching, boundaries
 
 
 def command_line():
@@ -78,7 +78,7 @@ def __main__():
             print(
                 f"Feature: {feature_id} ({np.min(data[feature_id])}, {np.max(data[feature_id])})"
             )
-            data[feature_id] = normalize(data[feature_id])
+            data[feature_id] = normalize(data[feature_id], min_max=boundaries.get(training_columns[feature_id], None))
             print(
                 f"Feature: {feature_id} ({np.min(data[feature_id])}, {np.max(data[feature_id])})"
             )

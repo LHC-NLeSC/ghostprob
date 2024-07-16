@@ -148,7 +148,7 @@ def __main__():
     tuner = tune.Tuner(
         tune.with_resources(
             tune.with_parameters(training_loop),
-            resources={"cpu": arguments.cpu, "gpu": arguments.gpu},
+            resources={"cpu": 1, "gpu": 0.25 if arguments.gpu > 0 else 0},
         ),
         tune_config=tune.TuneConfig(
             scheduler=scheduler, num_samples=arguments.num_samples

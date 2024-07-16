@@ -6,6 +6,7 @@ import torch
 from torch import nn
 from torch.utils.data import DataLoader
 import onnx2torch
+import matplotlib
 import matplotlib.pyplot as plt
 
 from utilities import (
@@ -202,6 +203,8 @@ def __main__():
     plt.xticks(thresholds)
     plt.ylim(0, 1)
     plt.legend()
+    if not matplotlib.is_interactive():
+        plt.savefig("accuracy.png")
     plt.show()
     # Plot accuracy components
     tp = list()
@@ -257,6 +260,8 @@ def __main__():
     plt.plot(thresholds, nn_real, label="NN - Real Tracks")
     plt.xticks(thresholds)
     plt.legend()
+    if not matplotlib.is_interactive():
+        plt.savefig("ghost_real.png")
     plt.show()
     plt.plot(thresholds, g_tp, label="True Positives")
     plt.plot(thresholds, g_tn, label="True Negatives")
@@ -264,6 +269,8 @@ def __main__():
     plt.plot(thresholds, g_fn, label="False Negatives")
     plt.xticks(thresholds)
     plt.legend()
+    if not matplotlib.is_interactive():
+        plt.savefig("confusion.png")
     plt.show()
     plt.plot(thresholds, sensitivity, label="Sensitivity")
     plt.plot(thresholds, specificity, label="Specificity")
@@ -271,6 +278,8 @@ def __main__():
     plt.plot(thresholds, fpr, label="False Positive Rate")
     plt.xticks(thresholds)
     plt.legend()
+    if not matplotlib.is_interactive():
+        plt.savefig("ssfnfp.png")
     plt.show()
     plt.plot(fpr, sensitivity, label="Neural Network")
     plt.plot([0, 0.5, 1], [0, 0.5, 1], label="Random Classifier")
@@ -279,6 +288,8 @@ def __main__():
     plt.xlim(0, 1)
     plt.ylim(0, 1)
     plt.legend()
+    if not matplotlib.is_interactive():
+        plt.savefig("roc.png")
     plt.show()
     J = np.asarray(sensitivity) - np.asarray(fpr)
     f1_score = (np.asarray(tp) * 2) / (

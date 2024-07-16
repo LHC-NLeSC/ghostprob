@@ -156,6 +156,9 @@ def __main__():
         run_config=train.RunConfig(
             storage_path=arguments.path,
             log_to_file=True,
+            checkpoint_config=train.CheckpointConfig(
+                num_to_keep=5
+            )
         ),
         param_space=tuning_config,
     )

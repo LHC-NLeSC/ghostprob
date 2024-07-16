@@ -108,6 +108,19 @@ def training_loop(config):
             optimizer.load_state_dict(optimizer_state)
     start_epoch = 0
     num_epochs = config["epochs"]
+
+    def report(epoch, metrics, force=False):
+        if (epoch % 10 == 0 and epoch != 0) or force:
+            with tempfile.TemporaryDirectory(dir=config['tmp_path']) as temp_checkpoint_dir:
+                path = os.path.join(temp_checkpoint_dir, "ghost_checkpoint.pt")
+                torch.save((model.state_dict(), optimizer.state_dict()), path)
+                checkpoint = train.Checkpoint.from_directory(temp_checkpoint_dir)
+                train.report(metrics=metrics, checkpoint=checkpoint)
+        else:
+            train.report(metrics=metrics)
+
+
+    metrics = None
     for epoch in range(start_epoch, num_epochs):
         inner_training_loop(
             model,
@@ -124,11 +137,7 @@ def training_loop(config):
             config["threshold"],
         )
         metrics = {"loss": loss, "accuracy": accuracy}
-        with tempfile.TemporaryDirectory() as temp_checkpoint_dir:
-            path = os.path.join(temp_checkpoint_dir, "ghost_checkpoint.pt")
-            torch.save((model.state_dict(), optimizer.state_dict()), path)
-            checkpoint = train.Checkpoint.from_directory(temp_checkpoint_dir)
-            train.report(metrics=metrics, checkpoint=checkpoint)
+        report(epoch, metrics, epoch == num_epochs - 1)
 
 
 def inner_training_loop(model, dataloader, device, optimizer, loss_function):

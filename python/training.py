@@ -139,6 +139,7 @@ def __main__():
         "network": arguments.network,
         "use_cuda": use_cuda,
         "loss_function": loss_function,
+        "tmp_path": arguments.tmp_path
     }
     if arguments.network == 1:
         tuning_config["normalization"] = tune.choice(

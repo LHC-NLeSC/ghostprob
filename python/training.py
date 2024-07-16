@@ -106,7 +106,7 @@ def __main__():
         metric="loss",
         mode="min",
         max_t=num_epochs,
-        grace_period=2,
+        grace_period=8,
         reduction_factor=2,
     )
     loss_function = nn.BCELoss()

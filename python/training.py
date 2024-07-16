@@ -132,8 +132,10 @@ def __main__():
                 nn.Softmin,
             ]
         ),
-        "training_dataset": (data_train, labels_train),
-        "validation_dataset": (data_validation, labels_validation),
+        'data_train': data_train,
+        'labels_train': labels_train,
+        'data_validation': data_validation,
+        'labels_validation': labels_validation,
         "network": arguments.network,
         "use_cuda": use_cuda,
         "loss_function": loss_function,
@@ -169,7 +171,7 @@ def __main__():
     model_state, _ = torch.load(checkpoint_path)
 
     # device for best model
-    if config['use_cuda']:
+    if use_cuda:
         device = torch.device(f"cuda:0")
     else:
         device = torch.device("cpu")

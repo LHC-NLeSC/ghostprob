@@ -74,15 +74,23 @@ def __main__():
             plt.show()
     # Normalize each feature
     if arguments.normalize:
+        import json
+        offsets_and_scales = {}
         for feature_id in range(len(data)):
+            data_min_max = (float(np.min(data[feature_id])), float(np.max(data[feature_id])))
+            min_max = boundaries.get(training_columns[feature_id], data_min_max)
+            offsets_and_scales[training_columns[feature_id]] = (min_max[0], min_max[1] - min_max[0])
             print(
-                f"Feature: {feature_id} ({np.min(data[feature_id])}, {np.max(data[feature_id])})"
+                f"Feature: {feature_id} {data_min_max}"
             )
-            data[feature_id] = normalize(data[feature_id], min_max=boundaries.get(training_columns[feature_id], None))
+            data[feature_id] = normalize(data[feature_id], min_max)
             print(
                 f"Feature: {feature_id} ({np.min(data[feature_id])}, {np.max(data[feature_id])})"
             )
             print()
+        with open(f"{arguments.output}_offsets_and_scales.json", "w") as jf:
+            json.dump(offsets_and_scales, jf)
+
     # split into real and ghost tracks
     data = np.hstack([data[i].reshape(len(data[0]), 1) for i in range(len(data))])
     data_ghost = data[labels == 1]

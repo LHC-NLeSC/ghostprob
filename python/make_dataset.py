@@ -1,6 +1,7 @@
 import argparse
 import numpy as np
 import matplotlib.pyplot as plt
+import json
 
 from utilities import load_data, shuffle_data, remove_nans, normalize
 from data import label, training_columns_forward, training_columns_matching, boundaries
@@ -73,8 +74,8 @@ def __main__():
             plt.stairs(counts, bins, fill=True)
             plt.show()
     # Normalize each feature
+    features = {'features': [training_columns[feature_id] for feature_id in range(len(data))]}
     if arguments.normalize:
-        import json
         offsets_and_scales = {}
         for feature_id in range(len(data)):
             data_min_max = (float(np.min(data[feature_id])), float(np.max(data[feature_id])))
@@ -88,8 +89,9 @@ def __main__():
                 f"Feature: {feature_id} ({np.min(data[feature_id])}, {np.max(data[feature_id])})"
             )
             print()
-        with open(f"{arguments.output}_offsets_and_scales.json", "w") as jf:
-            json.dump(offsets_and_scales, jf)
+        features['offsets_and_scales'] = offsets_and_scales
+    with open(f"{arguments.output}_features.json", "w") as jf:
+        json.dump(features, jf, indent=4)
 
     # split into real and ghost tracks
     data = np.hstack([data[i].reshape(len(data[0]), 1) for i in range(len(data))])

@@ -1,9 +1,10 @@
 import argparse
 import numpy as np
 import matplotlib.pyplot as plt
+import json
 
 from utilities import load_data, shuffle_data, remove_nans, normalize
-from data import label, training_columns_forward, training_columns_matching
+from data import label, training_columns_forward, training_columns_matching, boundaries
 
 
 def command_line():
@@ -73,16 +74,25 @@ def __main__():
             plt.stairs(counts, bins, fill=True)
             plt.show()
     # Normalize each feature
+    features = {'features': [training_columns[feature_id] for feature_id in range(len(data))]}
     if arguments.normalize:
+        offsets_and_scales = {}
         for feature_id in range(len(data)):
+            data_min_max = (float(np.min(data[feature_id])), float(np.max(data[feature_id])))
+            min_max = boundaries.get(training_columns[feature_id], data_min_max)
+            offsets_and_scales[training_columns[feature_id]] = (min_max[0], min_max[1] - min_max[0])
             print(
-                f"Feature: {feature_id} ({np.min(data[feature_id])}, {np.max(data[feature_id])})"
+                f"Feature: {feature_id} {data_min_max}"
             )
-            data[feature_id] = normalize(data[feature_id])
+            data[feature_id] = normalize(data[feature_id], min_max)
             print(
                 f"Feature: {feature_id} ({np.min(data[feature_id])}, {np.max(data[feature_id])})"
             )
             print()
+        features['offsets_and_scales'] = offsets_and_scales
+    with open(f"{arguments.output}_features.json", "w") as jf:
+        json.dump(features, jf, indent=4)
+
     # split into real and ghost tracks
     data = np.hstack([data[i].reshape(len(data[0]), 1) for i in range(len(data))])
     data_ghost = data[labels == 1]

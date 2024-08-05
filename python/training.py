@@ -55,6 +55,12 @@ def command_line():
         default="/tmp/ghostprob/",
     )
     parser.add_argument(
+        "--tmp-path",
+        help="Where to store the tuning output.",
+        type=str,
+        default="/tmp/ray/",
+    )
+    parser.add_argument(
         "--cpu", help="Number of CPU cores to use for training.", type=int, default=1
     )
     parser.add_argument("--nocuda", help="Disable CUDA", action="store_true")
@@ -73,11 +79,7 @@ def command_line():
 
 def __main__():
     arguments = command_line()
-    if not arguments.nocuda and torch.cuda.is_available():
-        device = torch.device(f"cuda:{arguments.cuda}")
-    else:
-        device = torch.device("cpu")
-    print(f"Device: {device}")
+    use_cuda = not arguments.nocuda and torch.cuda.is_available()
     # initialize ray
     ray.init(
         num_cpus=arguments.cpu,
@@ -86,6 +88,7 @@ def __main__():
         log_to_driver=False,
         logging_level=logging.ERROR,
         include_dashboard=False,
+        _temp_dir=arguments.tmp_path
     )
     # create training, validation, and testing data sets
     data_train = np.load(f"{arguments.filename}_train_data.npy")
@@ -97,25 +100,13 @@ def __main__():
     data_test = np.load(f"{arguments.filename}_test_data.npy")
     labels_test = np.load(f"{arguments.filename}_test_labels.npy")
     print(f"Test set size: {len(data_test)}")
-    training_dataset = GhostDataset(
-        torch.tensor(data_train, dtype=torch.float32, device=device),
-        torch.tensor(labels_train, dtype=torch.float32, device=device),
-    )
-    validation_dataset = GhostDataset(
-        torch.tensor(data_validation, dtype=torch.float32, device=device),
-        torch.tensor(labels_validation, dtype=torch.float32, device=device),
-    )
-    test_dataset = GhostDataset(
-        torch.tensor(data_test, dtype=torch.float32, device=device),
-        torch.tensor(labels_test, dtype=torch.float32, device=device),
-    )
     num_features = data_train.shape[1]
     num_epochs = arguments.epochs
     scheduler = ASHAScheduler(
         metric="loss",
         mode="min",
         max_t=num_epochs,
-        grace_period=2,
+        grace_period=8,
         reduction_factor=2,
     )
     loss_function = nn.BCELoss()
@@ -141,11 +132,14 @@ def __main__():
                 nn.Softmin,
             ]
         ),
-        "training_dataset": training_dataset,
-        "validation_dataset": validation_dataset,
+        'data_train': data_train,
+        'labels_train': labels_train,
+        'data_validation': data_validation,
+        'labels_validation': labels_validation,
         "network": arguments.network,
-        "device": device,
+        "use_cuda": use_cuda,
         "loss_function": loss_function,
+        "tmp_path": arguments.tmp_path
     }
     if arguments.network == 1:
         tuning_config["normalization"] = tune.choice(
@@ -154,15 +148,17 @@ def __main__():
     tuner = tune.Tuner(
         tune.with_resources(
             tune.with_parameters(training_loop),
-            resources={"cpu": arguments.cpu, "gpu": arguments.gpu},
+            resources={"cpu": 1, "gpu": 0.25 if arguments.gpu > 0 else 0},
         ),
         tune_config=tune.TuneConfig(
             scheduler=scheduler, num_samples=arguments.num_samples
         ),
         run_config=train.RunConfig(
-            local_dir=arguments.path,
             storage_path=arguments.path,
             log_to_file=True,
+            checkpoint_config=train.CheckpointConfig(
+                num_to_keep=5
+            )
         ),
         param_space=tuning_config,
     )
@@ -171,11 +167,19 @@ def __main__():
     print(f"Best trial config: {best_trial.config}")
     print(f"Best trial final validation loss: {best_trial.metrics['loss']}")
     print(f"Best trial final validation accuracy: {best_trial.metrics['accuracy']}")
+
     # load best model
     checkpoint_path = os.path.join(
         best_trial.checkpoint.to_directory(), "ghost_checkpoint.pt"
     )
     model_state, _ = torch.load(checkpoint_path)
+
+    # device for best model
+    if use_cuda:
+        device = torch.device(f"cuda:0")
+    else:
+        device = torch.device("cpu")
+
     if arguments.network == 0:
         model = GhostNetwork(
             num_features,
@@ -206,6 +210,10 @@ def __main__():
     )
     print()
     # test accuracy
+    test_dataset = GhostDataset(
+        torch.tensor(data_test, dtype=torch.float32, device=device),
+        torch.tensor(labels_test, dtype=torch.float32, device=device),
+    )
     test_dataloader = DataLoader(test_dataset, batch_size=arguments.batch)
     accuracy, loss = testing_loop(
         device, model, test_dataloader, loss_function, arguments.threshold

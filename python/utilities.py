@@ -50,11 +50,29 @@ def select_optimizer(config, model):
 
 
 def training_loop(config):
+    if config['use_cuda']:
+        device = torch.device(f"cuda:0")
+    else:
+        device = torch.device("cpu")
+
+    data_train = config['data_train']
+    labels_train = config['labels_train']
+    training_dataset = GhostDataset(
+        torch.tensor(data_train, dtype=torch.float32, device=device),
+        torch.tensor(labels_train, dtype=torch.float32, device=device),
+    )
+    data_validation = config['data_validation']
+    labels_validation = config['labels_validation']
+    validation_dataset = GhostDataset(
+        torch.tensor(data_validation, dtype=torch.float32, device=device),
+        torch.tensor(labels_validation, dtype=torch.float32, device=device),
+    )
+
     training_dataloader = DataLoader(
-        config["training_dataset"], batch_size=int(config["batch"])
+        training_dataset, batch_size=int(config["batch"])
     )
     validation_dataloader = DataLoader(
-        config["validation_dataset"], batch_size=int(config["batch"])
+        validation_dataset, batch_size=int(config["batch"])
     )
     # model
     if config["network"] == 0:
@@ -76,10 +94,10 @@ def training_loop(config):
             l0=config["l0"],
             matching=True,
             activation=config["activation"],
-            device=config["device"],
+            device=device,
         )
     optimizer = select_optimizer(config, model)
-    model = model.to(config["device"])
+    model = model.to(device)
     if train.get_checkpoint():
         loaded_checkpoint = train.get_checkpoint()
         with loaded_checkpoint.as_directory() as loaded_checkpoint_dir:
@@ -90,27 +108,36 @@ def training_loop(config):
             optimizer.load_state_dict(optimizer_state)
     start_epoch = 0
     num_epochs = config["epochs"]
+
+    def report(epoch, metrics, force=False):
+        if (epoch % 10 == 0 and epoch != 0) or force:
+            with tempfile.TemporaryDirectory(dir=config['tmp_path']) as temp_checkpoint_dir:
+                path = os.path.join(temp_checkpoint_dir, "ghost_checkpoint.pt")
+                torch.save((model.state_dict(), optimizer.state_dict()), path)
+                checkpoint = train.Checkpoint.from_directory(temp_checkpoint_dir)
+                train.report(metrics=metrics, checkpoint=checkpoint)
+        else:
+            train.report(metrics=metrics)
+
+
+    metrics = None
     for epoch in range(start_epoch, num_epochs):
         inner_training_loop(
             model,
             training_dataloader,
-            config["device"],
+            device,
             optimizer,
             config["loss_function"],
         )
         accuracy, loss = testing_loop(
-            config["device"],
+            device,
             model,
             validation_dataloader,
             config["loss_function"],
             config["threshold"],
         )
         metrics = {"loss": loss, "accuracy": accuracy}
-        with tempfile.TemporaryDirectory() as temp_checkpoint_dir:
-            path = os.path.join(temp_checkpoint_dir, "ghost_checkpoint.pt")
-            torch.save((model.state_dict(), optimizer.state_dict()), path)
-            checkpoint = train.Checkpoint.from_directory(temp_checkpoint_dir)
-            train.report(metrics=metrics, checkpoint=checkpoint)
+        report(epoch, metrics, epoch == num_epochs - 1)
 
 
 def inner_training_loop(model, dataloader, device, optimizer, loss_function):
@@ -210,9 +237,12 @@ def remove_nans(data, labels):
     return data, labels
 
 
-def normalize(data: np.array) -> np.array:
-    minimum = np.min(data)
-    maximum = np.max(data)
+def normalize(data, min_max=None) -> np.array:
+    if min_max is None:
+        minimum = np.min(data)
+        maximum = np.max(data)
+    else:
+        minimum, maximum = min_max
     with np.errstate(divide="ignore"):
         if np.isfinite(np.random.rand(1) / (maximum - minimum)):
             return (data - minimum) / (maximum - minimum)

@@ -50,27 +50,25 @@ def select_optimizer(config, model):
 
 
 def training_loop(config):
-    if config['use_cuda']:
+    if config["use_cuda"]:
         device = torch.device(f"cuda:0")
     else:
         device = torch.device("cpu")
 
-    data_train = config['data_train']
-    labels_train = config['labels_train']
+    data_train = config["data_train"]
+    labels_train = config["labels_train"]
     training_dataset = GhostDataset(
         torch.tensor(data_train, dtype=torch.float32, device=device),
         torch.tensor(labels_train, dtype=torch.float32, device=device),
     )
-    data_validation = config['data_validation']
-    labels_validation = config['labels_validation']
+    data_validation = config["data_validation"]
+    labels_validation = config["labels_validation"]
     validation_dataset = GhostDataset(
         torch.tensor(data_validation, dtype=torch.float32, device=device),
         torch.tensor(labels_validation, dtype=torch.float32, device=device),
     )
 
-    training_dataloader = DataLoader(
-        training_dataset, batch_size=int(config["batch"])
-    )
+    training_dataloader = DataLoader(training_dataset, batch_size=int(config["batch"]))
     validation_dataloader = DataLoader(
         validation_dataset, batch_size=int(config["batch"])
     )
@@ -111,14 +109,15 @@ def training_loop(config):
 
     def report(epoch, metrics, force=False):
         if (epoch % 10 == 0 and epoch != 0) or force:
-            with tempfile.TemporaryDirectory(dir=config['tmp_path']) as temp_checkpoint_dir:
+            with tempfile.TemporaryDirectory(
+                dir=config["tmp_path"]
+            ) as temp_checkpoint_dir:
                 path = os.path.join(temp_checkpoint_dir, "ghost_checkpoint.pt")
                 torch.save((model.state_dict(), optimizer.state_dict()), path)
                 checkpoint = train.Checkpoint.from_directory(temp_checkpoint_dir)
                 train.report(metrics=metrics, checkpoint=checkpoint)
         else:
             train.report(metrics=metrics)
-
 
     metrics = None
     for epoch in range(start_epoch, num_epochs):

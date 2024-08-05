@@ -70,7 +70,7 @@ def command_line():
     parser.add_argument(
         "--config",
         help="Name of the file containing the model configuration.",
-        type=str
+        type=str,
     )
     parser.add_argument(
         "--normalize",
@@ -177,9 +177,7 @@ def __main__():
     print()
     print(model)
     print()
-    test_dataloader = DataLoader(
-        test_dataset, batch_size=batch_size, shuffle=True
-    )
+    test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
     loss_function = nn.BCELoss()
     # Accuracy test (CLI)
     accuracies = list()

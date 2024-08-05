@@ -74,22 +74,28 @@ def __main__():
             plt.stairs(counts, bins, fill=True)
             plt.show()
     # Normalize each feature
-    features = {'features': [training_columns[feature_id] for feature_id in range(len(data))]}
+    features = {
+        "features": [training_columns[feature_id] for feature_id in range(len(data))]
+    }
     if arguments.normalize:
         offsets_and_scales = {}
         for feature_id in range(len(data)):
-            data_min_max = (float(np.min(data[feature_id])), float(np.max(data[feature_id])))
-            min_max = boundaries.get(training_columns[feature_id], data_min_max)
-            offsets_and_scales[training_columns[feature_id]] = (min_max[0], min_max[1] - min_max[0])
-            print(
-                f"Feature: {feature_id} {data_min_max}"
+            data_min_max = (
+                float(np.min(data[feature_id])),
+                float(np.max(data[feature_id])),
             )
+            min_max = boundaries.get(training_columns[feature_id], data_min_max)
+            offsets_and_scales[training_columns[feature_id]] = (
+                min_max[0],
+                min_max[1] - min_max[0],
+            )
+            print(f"Feature: {feature_id} {data_min_max}")
             data[feature_id] = normalize(data[feature_id], min_max)
             print(
                 f"Feature: {feature_id} ({np.min(data[feature_id])}, {np.max(data[feature_id])})"
             )
             print()
-        features['offsets_and_scales'] = offsets_and_scales
+        features["offsets_and_scales"] = offsets_and_scales
     with open(f"{arguments.output}_features.json", "w") as jf:
         json.dump(features, jf, indent=4)
 

@@ -27,5 +27,4 @@ training_columns_matching = [
     "qop",
 ]
 
-boundaries = {"best_pt": (0, 1e4),
-              "chi2": (0, 400)}
+boundaries = {"best_pt": (0, 1e4), "chi2": (0, 400)}

@@ -88,7 +88,7 @@ def __main__():
         log_to_driver=False,
         logging_level=logging.ERROR,
         include_dashboard=False,
-        _temp_dir=arguments.tmp_path
+        _temp_dir=arguments.tmp_path,
     )
     # create training, validation, and testing data sets
     data_train = np.load(f"{arguments.filename}_train_data.npy")
@@ -132,14 +132,14 @@ def __main__():
                 nn.Softmin,
             ]
         ),
-        'data_train': data_train,
-        'labels_train': labels_train,
-        'data_validation': data_validation,
-        'labels_validation': labels_validation,
+        "data_train": data_train,
+        "labels_train": labels_train,
+        "data_validation": data_validation,
+        "labels_validation": labels_validation,
         "network": arguments.network,
         "use_cuda": use_cuda,
         "loss_function": loss_function,
-        "tmp_path": arguments.tmp_path
+        "tmp_path": arguments.tmp_path,
     }
     if arguments.network == 1:
         tuning_config["normalization"] = tune.choice(
@@ -156,9 +156,7 @@ def __main__():
         run_config=train.RunConfig(
             storage_path=arguments.path,
             log_to_file=True,
-            checkpoint_config=train.CheckpointConfig(
-                num_to_keep=5
-            )
+            checkpoint_config=train.CheckpointConfig(num_to_keep=5),
         ),
         param_space=tuning_config,
     )

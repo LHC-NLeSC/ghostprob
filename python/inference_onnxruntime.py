@@ -6,8 +6,13 @@ from torch.utils.data import DataLoader
 import onnxruntime as ort
 import matplotlib.pyplot as plt
 
-from utilities import load_data, remove_nans, shuffle_data, GhostDataset, normalize
-from data import label, training_columns_forward, training_columns_matching
+from utilities import load_data, remove_nans, shuffle_data, normalize
+from data import (
+    label,
+    training_columns_forward,
+    training_columns_matching,
+    GhostDataset,
+)
 
 thresholds = [
     0.1,

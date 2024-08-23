@@ -12,7 +12,6 @@ import matplotlib.pyplot as plt
 from utilities import (
     load_data,
     shuffle_data,
-    GhostDataset,
     testing_loop,
     remove_nans,
     testing_accuracy,
@@ -23,7 +22,12 @@ from networks import (
     GhostNetworkWithNormalization,
     GhostNetworkWithManualNormalization,
 )
-from data import label, training_columns_forward, training_columns_matching
+from data import (
+    label,
+    training_columns_forward,
+    training_columns_matching,
+    GhostDataset,
+)
 
 thresholds = [
     0.1,

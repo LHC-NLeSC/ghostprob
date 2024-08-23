@@ -1,3 +1,5 @@
+from torch.utils.data import Dataset
+
 label = "ghost"
 
 training_columns_forward = [
@@ -28,3 +30,15 @@ training_columns_matching = [
 ]
 
 boundaries = {"best_pt": (0, 1e4), "chi2": (0, 400)}
+
+
+class GhostDataset(Dataset):
+    def __init__(self, data, labels):
+        self.data = data
+        self.labels = labels
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, index):
+        return self.data[index], self.labels[index]

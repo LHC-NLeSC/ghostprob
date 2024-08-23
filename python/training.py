@@ -11,7 +11,6 @@ from ray import tune, train
 from ray.tune.schedulers import ASHAScheduler
 
 from utilities import (
-    GhostDataset,
     training_loop,
     inner_training_loop,
     testing_loop,
@@ -22,6 +21,7 @@ from networks import (
     GhostNetworkWithNormalization,
     GhostNetworkWithManualNormalization,
 )
+from data import GhostDataset
 
 
 def command_line():

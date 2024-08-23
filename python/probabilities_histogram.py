@@ -11,7 +11,6 @@ import matplotlib.pyplot as plt
 from utilities import (
     load_data,
     shuffle_data,
-    GhostDataset,
     remove_nans,
     normalize,
     infer_probabilities,
@@ -22,7 +21,12 @@ from networks import (
     GhostNetworkWithNormalization,
     GhostNetworkWithManualNormalization,
 )
-from data import label, training_columns_forward, training_columns_matching
+from data import (
+    label,
+    training_columns_forward,
+    training_columns_matching,
+    GhostDataset,
+)
 
 
 def command_line():

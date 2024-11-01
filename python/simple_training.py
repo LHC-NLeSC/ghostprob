@@ -1,5 +1,6 @@
 import argparse
 from collections import namedtuple
+import json
 
 import numpy as np
 import torch
@@ -269,6 +270,8 @@ def dataset(arguments: argparse.Namespace) -> tuple[DataLabels, DataLabels, Data
             )
             print()
         features["offsets_and_scales"] = offsets_and_scales
+    with open("feature-offsets-and-scales.json", "w") as jf:
+        json.dump(features, jf, indent=4)
 
     # split into real and ghost tracks
     data = np.hstack([data[i].reshape(len(data[0]), 1) for i in range(len(data))])

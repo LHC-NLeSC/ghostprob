@@ -212,7 +212,7 @@ def remove_nans(data, labels):
     return data, labels
 
 
-def normalize(data, min_max=None) -> np.array:
+def normalize(data, min_max=None) -> np.ndarray:
     if min_max is None:
         minimum = np.min(data)
         maximum = np.max(data)
@@ -247,7 +247,7 @@ def dataset(arguments: argparse.Namespace) -> tuple[DataLabels, DataLabels, Data
     data, labels = remove_nans(data, labels)
 
     # Normalize each feature
-    features = {
+    features: dict[str, list[str] | dict[str, tuple[float, float]]] = {
         "features": [training_columns[feature_id] for feature_id in range(len(data))]
     }
     if arguments.normalize:

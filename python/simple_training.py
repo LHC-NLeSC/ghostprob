@@ -146,6 +146,7 @@ class GhostNetworkWithManualNormalization(nn.Module):
         x = self.dequant(x)
         return x
 
+
 normalization_layers = [nn.BatchNorm1d, nn.LazyBatchNorm1d, nn.SyncBatchNorm]
 activation_layers = [
     nn.ReLU,
@@ -228,7 +229,7 @@ def normalize(data, min_max=None) -> np.ndarray:
 def dataset(arguments: argparse.Namespace) -> tuple[DataLabels, DataLabels, DataLabels]:
     dataframe, columns = load_data(arguments.filename)
     print(f"Columns in the table: {len(dataframe)}")
-    print(columns)
+    print("\n".join(map(str, columns)))
     if label not in columns:
         raise ValueError(f"Missing labels: {label} ∉ {columns}")
     labels = dataframe[label].astype(int)
@@ -239,10 +240,10 @@ def dataset(arguments: argparse.Namespace) -> tuple[DataLabels, DataLabels, Data
     for column in training_columns:
         if column not in columns:
             raise ValueError(f"Missing training data: {column} ∉ {columns}")
-    trainining_columns = training_columns
-    print(f"Columns for training: {len(trainining_columns)}")
+    print(f"Columns to train: {len(training_columns)}")
+    print("\n".join(map(str, training_columns)))
     print(f"Entries in the table: {len(dataframe[label])}")
-    data = [dataframe[column] for column in trainining_columns]
+    data = [dataframe[column] for column in training_columns]
 
     # Remove NaNs
     data, labels = remove_nans(data, labels)
@@ -263,12 +264,7 @@ def dataset(arguments: argparse.Namespace) -> tuple[DataLabels, DataLabels, Data
                 min_max[0],
                 min_max[1] - min_max[0],
             )
-            print(f"Feature: {feature_id} {data_min_max}")
             data[feature_id] = normalize(data[feature_id], min_max)
-            print(
-                f"Feature: {feature_id} ({np.min(data[feature_id])}, {np.max(data[feature_id])})"
-            )
-            print()
         features["offsets_and_scales"] = offsets_and_scales
     with open("feature-offsets-and-scales.json", "w") as jf:
         json.dump(features, jf, indent=4)
